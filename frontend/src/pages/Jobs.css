@@ -1,0 +1,90 @@
+.job-form-box {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  max-width: 600px;
+  margin-bottom: 2rem;
+}
+
+.job-form-box h2 {
+  margin-bottom: 1rem;
+  color: #2c3e50;
+}
+
+.job-form-box form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.job-form-box input,
+.job-form-box textarea {
+  padding: 0.7rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.95rem;
+}
+
+.job-form-box textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.job-form-box button {
+  padding: 0.75rem;
+  background: #2c3e50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.job-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.job-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.job-card h3 {
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.job-card p {
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+}
+
+.job-card button {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background: #2980b9;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.skill-tag {
+  background: #e8f4fd;
+  color: #2980b9;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+}
