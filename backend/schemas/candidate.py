@@ -1,17 +1,18 @@
 from pydantic import BaseModel
+from typing import Optional, List, Any
 from datetime import datetime
-from typing import List, Optional
 
 class CandidateOut(BaseModel):
     id: int
-    name: str
-    email: Optional[str]
-    phone: Optional[str]
-    education: Optional[str]
-    experience: Optional[str]
-    skills: Optional[List[str]]
-    cv_filename: Optional[str]
-    created_at: datetime
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    skills: Optional[List[str]] = []
+    education: Optional[Any] = None
+    experience: Optional[Any] = None
+    cv_filename: Optional[str] = None
+    cluster_id: Optional[int] = None
+    uploaded_at: datetime
 
     class Config:
         from_attributes = True

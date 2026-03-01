@@ -73,3 +73,17 @@ def get_candidate(
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
     return candidate
+
+
+@router.delete("/{candidate_id}")
+def delete_candidate(
+    candidate_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    db.delete(candidate)
+    db.commit()
+    return {"message": "Candidate deleted successfully"}
