@@ -27,6 +27,16 @@ const Dashboard = () => {
     fetchCandidates(search);
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this candidate?')) return;
+    try {
+      await API.delete(`/candidates/${id}`);
+      setCandidates(candidates.filter(c => c.id !== id));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
     <div className="page">
       <h1>Candidates</h1>
@@ -57,6 +67,7 @@ const Dashboard = () => {
                 <p className="cluster">Cluster: {c.cluster_id}</p>
               )}
               <p className="date">Uploaded: {new Date(c.uploaded_at).toLocaleDateString()}</p>
+              <button className="delete-btn" onClick={() => handleDelete(c.id)}>Delete</button>
             </div>
           ))}
         </div>

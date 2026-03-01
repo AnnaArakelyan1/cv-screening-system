@@ -35,6 +35,16 @@ const Jobs = () => {
     setLoading(false);
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this job?')) return;
+    try {
+      await API.delete(`/jobs/${id}`);
+      setJobs(jobs.filter(j => j.id !== id));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
     <div className="page">
       <h1>Job Postings</h1>
@@ -66,6 +76,9 @@ const Jobs = () => {
             </div>
             <button onClick={() => navigate(`/jobs/${job.id}/match`)}>
               View Matched Candidates
+            </button>
+            <button className="delete-btn" onClick={() => handleDelete(job.id)}>
+              Delete
             </button>
           </div>
         ))}
