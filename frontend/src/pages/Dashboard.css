@@ -96,3 +96,14 @@
 .delete-btn:hover {
   background: #c0392b;
 }
+
+.results-count {
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.skill-tag.highlighted {
+  background: #f39c12;
+  color: white;
+}
