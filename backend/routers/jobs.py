@@ -5,8 +5,8 @@ from models.job import Job
 from models.candidate import Candidate
 from models.user import User
 from models.match_result import MatchResult
+from models.application import Application
 from schemas.job import JobCreate, JobOut
-from schemas.candidate import CandidateMatchResult
 from utils.auth import get_current_user
 from utils.matcher import get_embedding, calculate_match_score
 from typing import List
@@ -33,7 +33,7 @@ def get_jobs(
 ):
     return db.query(Job).all()
 
-@router.get("/{job_id}/match", response_model=List[CandidateMatchResult])
+@router.get("/{job_id}/match")
 def match_candidates(
     job_id: int,
     db: Session = Depends(get_db),
@@ -43,53 +43,57 @@ def match_candidates(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
+    applications = db.query(Application).filter(Application.job_id == job_id).all()
+    applied_candidate_ids = {app.candidate_id: app.status for app in applications}
+
     candidates = db.query(Candidate).filter(Candidate.embedding != None).all()
     results = []
 
     for candidate in candidates:
-        score = calculate_match_score(candidate.embedding, job.embedding)
+        scores = calculate_match_score(
+            candidate_embedding=candidate.embedding,
+            job_embedding=job.embedding,
+            candidate_experience_text=candidate.experience,
+            candidate_education_text=candidate.education,
+            required_experience_years=job.required_experience_years or 0,
+            required_education=job.required_education or "",
+        )
 
-        # Save or update match result in database
+        is_applied = candidate.id in applied_candidate_ids
+
         existing = db.query(MatchResult).filter(
             MatchResult.candidate_id == candidate.id,
             MatchResult.job_id == job_id
         ).first()
-
         if existing:
-            existing.match_score = score
+            existing.match_score = scores["final_score"]
         else:
-            match_result = MatchResult(
+            db.add(MatchResult(
                 candidate_id=candidate.id,
                 job_id=job_id,
-                match_score=score
-            )
-            db.add(match_result)
+                match_score=scores["final_score"]
+            ))
 
-        results.append({"candidate": candidate, "match_score": score})
+        results.append({
+            "candidate": {
+                "id": candidate.id,
+                "full_name": candidate.full_name,
+                "email": candidate.email,
+                "phone": candidate.phone,
+                "skills": candidate.skills,
+                "cluster_id": candidate.cluster_id,
+                "uploaded_at": candidate.uploaded_at.isoformat(),
+                "cv_filename": candidate.cv_filename,
+            },
+            "match_score": scores["final_score"],
+            "semantic_score": scores["semantic_score"],
+            "experience_score": scores["experience_score"],
+            "education_score": scores["education_score"],
+            "candidate_years": scores["candidate_years"],
+            "applied": is_applied,
+            "application_status": applied_candidate_ids.get(candidate.id, None)
+        })
 
     db.commit()
-    results.sort(key=lambda x: x["match_score"], reverse=True)
+    results.sort(key=lambda x: (not x["applied"], -x["match_score"]))
     return results
-
-@router.get("/{job_id}/match/history")
-def get_match_history(
-    job_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    results = db.query(MatchResult).filter(MatchResult.job_id == job_id).all()
-    return results
-
-
-@router.delete("/{job_id}")
-def delete_job(
-    job_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    job = db.query(Job).filter(Job.id == job_id).first()
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    db.delete(job)
-    db.commit()
-    return {"message": "Job deleted successfully"}

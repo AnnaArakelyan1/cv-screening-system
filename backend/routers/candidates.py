@@ -25,11 +25,17 @@ async def upload_cv(
     embedding = get_embedding(parsed["raw_text"])
 
     candidate = Candidate(
-        **parsed,
-        cv_filename=file.filename,
-        embedding=embedding,
-        uploaded_by=current_user.id
-    )
+    full_name=parsed["full_name"],
+    email=parsed["email"],
+    phone=parsed["phone"],
+    skills=parsed["skills"],
+    education=parsed.get("education"),
+    experience=parsed.get("experience"),
+    raw_text=parsed["raw_text"],
+    cv_filename=file.filename,
+    embedding=embedding,
+    uploaded_by=current_user.id
+)
     db.add(candidate)
     db.commit()
     db.refresh(candidate)
