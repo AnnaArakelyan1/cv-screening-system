@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import API from '../api';
+import Toast from '../components/Toast';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -7,6 +8,11 @@ const Dashboard = () => {
   const [allCandidates, setAllCandidates] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+  };
 
   const fetchCandidates = async () => {
     setLoading(true);
@@ -28,7 +34,6 @@ const Dashboard = () => {
       setCandidates(allCandidates);
       return;
     }
-    // Support multiple skills separated by comma
     const searchSkills = search.toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
     const filtered = allCandidates.filter(c =>
       searchSkills.every(skill =>
@@ -47,11 +52,15 @@ const Dashboard = () => {
     if (!window.confirm('Are you sure you want to delete this candidate?')) return;
     try {
       await API.delete(`/candidates/${id}`);
-      const updated = candidates.filter(c => c.id !== id);
-      setCandidates(updated);
-      setAllCandidates(allCandidates.filter(c => c.id !== id));
+      setCandidates(prev => prev.filter(c => c.id !== id));
+      setAllCandidates(prev => prev.filter(c => c.id !== id));
+      showToast('Candidate deleted successfully.', 'success');
     } catch (err) {
-      console.error(err);
+      if (err.response?.status === 403) {
+        showToast('You can only delete candidates you uploaded.', 'error');
+      } else {
+        showToast('Failed to delete candidate.', 'error');
+      }
     }
   };
 
@@ -108,6 +117,14 @@ const Dashboard = () => {
             </div>
           ))}
         </div>
+      )}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );

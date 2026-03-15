@@ -1,13 +1,23 @@
+# Environment variables
+.env
+*.env
+backend/.env
+frontend/.env
+frontend/.env.local
+
 # Python
 __pycache__/
 *.py[cod]
 *.pyo
-.env
 
 # Node
 frontend/node_modules/
 frontend/build/
-frontend/.env.local
 
 # Docker
 *.log
+postgres_data/
+
+# IDE
+.vscode/
+.idea/

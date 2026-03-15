@@ -1,0 +1,84 @@
+.profile-card {
+  background: white;
+  border-radius: 10px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+  border-left: 4px solid #2980b9;
+}
+
+.profile-info h2 {
+  color: #2c3e50;
+  margin-bottom: 0.3rem;
+}
+
+.profile-info p {
+  color: #888;
+  font-size: 0.9rem;
+  margin: 0.2rem 0;
+}
+
+.admin-badge {
+  background: #2980b9;
+  color: white;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  margin-top: 0.5rem;
+  display: inline-block;
+}
+
+.users-section h2 {
+  color: #2c3e50;
+  margin-bottom: 1rem;
+}
+
+.users-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.user-card {
+  background: white;
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.user-info h3 {
+  color: #2c3e50;
+  margin: 0 0 0.3rem 0;
+}
+
+.user-info p {
+  color: #888;
+  font-size: 0.85rem;
+  margin: 0.2rem 0;
+}
+
+.user-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.admin-btn {
+  padding: 0.4rem 1rem;
+  background: #2980b9;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.admin-btn:hover {
+  background: #2471a3;
+}

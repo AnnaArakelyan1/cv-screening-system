@@ -19,6 +19,7 @@ const Navbar = () => {
         <Link to="/">Dashboard</Link>
         <Link to="/upload">Upload CV</Link>
         <Link to="/jobs">Jobs</Link>
+        <Link to="/profile">Profile</Link>
         <button onClick={handleLogout}>Logout</button>
       </div>
     </nav>

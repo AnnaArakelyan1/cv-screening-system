@@ -65,6 +65,7 @@ def match_candidates(
             MatchResult.candidate_id == candidate.id,
             MatchResult.job_id == job_id
         ).first()
+
         if existing:
             existing.match_score = scores["final_score"]
         else:
@@ -96,4 +97,23 @@ def match_candidates(
 
     db.commit()
     results.sort(key=lambda x: (not x["applied"], -x["match_score"]))
-    return results
+
+    return {
+        "results": results,
+        "emails_sent": 0
+    }
+
+@router.delete("/{job_id}")
+def delete_job(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.created_by != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only delete your own job postings")
+    db.delete(job)
+    db.commit()
+    return {"message": "Job deleted successfully"}

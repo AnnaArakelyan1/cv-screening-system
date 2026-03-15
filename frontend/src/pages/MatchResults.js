@@ -9,13 +9,19 @@ const MatchResults = () => {
   const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState(false);
+  const [emailModal, setEmailModal] = useState(null);
+  const [emailForm, setEmailForm] = useState({ subject: '', body: '' });
+  const [sending, setSending] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const matchRes = await API.get(`/jobs/${id}/match`);
-        setResults(matchRes.data);
+        setResults(matchRes.data.results);
+        if (matchRes.data.emails_sent > 0) {
+          alert(`✅ ${matchRes.data.emails_sent} candidate(s) automatically notified by email.`);
+        }
       } catch (err) {
         console.error(err);
       }
@@ -55,7 +61,7 @@ const MatchResults = () => {
       } catch (err) {}
     }
     const res = await API.get(`/jobs/${id}/match`);
-    setResults(res.data);
+    setResults(res.data.results);
     setSelected([]);
     setAssigning(false);
     alert(`Successfully assigned ${success} candidate(s).`);
@@ -69,10 +75,35 @@ const MatchResults = () => {
       if (!application) return;
       await API.delete(`/applications/${application.id}`);
       const res = await API.get(`/jobs/${id}/match`);
-      setResults(res.data);
+      setResults(res.data.results);
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const openEmailModal = (candidate) => {
+    setEmailModal(candidate);
+    setEmailForm({
+      subject: `Regarding your application`,
+      body: `Dear ${candidate.full_name || 'Candidate'},\n\nThank you for your application. We would like to inform you that...\n\nBest regards,\nHR Team`
+    });
+  };
+
+  const handleSendEmail = async () => {
+    if (!emailForm.subject || !emailForm.body) return;
+    setSending(true);
+    try {
+      await API.post('/email/send', {
+        to_email: emailModal.email,
+        subject: emailForm.subject,
+        body: emailForm.body
+      });
+      alert(`Email sent to ${emailModal.email}`);
+      setEmailModal(null);
+    } catch (err) {
+      alert('Failed to send email. Check your email credentials in backend/.env');
+    }
+    setSending(false);
   };
 
   const getScoreColor = (score) => {
@@ -113,6 +144,12 @@ const MatchResults = () => {
           <div className="breakdown-years">{r.candidate_years} yrs exp</div>
         )}
       </div>
+      <button
+        className="email-btn"
+        onClick={(e) => { e.stopPropagation(); openEmailModal(r.candidate); }}
+      >
+        ✉ Email
+      </button>
       {showUnassign && (
         <button className="unassign-btn" onClick={() => handleUnassign(r.candidate.id)}>
           Unassign
@@ -231,6 +268,36 @@ const MatchResults = () => {
             </div>
           )}
         </>
+      )}
+
+      {/* Email Modal */}
+      {emailModal && (
+        <div className="modal-overlay" onClick={() => setEmailModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h3>Send Email to {emailModal.full_name || 'Candidate'}</h3>
+            <p className="modal-to">To: {emailModal.email}</p>
+            <input
+              type="text"
+              placeholder="Subject"
+              value={emailForm.subject}
+              onChange={e => setEmailForm({ ...emailForm, subject: e.target.value })}
+            />
+            <textarea
+              placeholder="Message body"
+              rows={8}
+              value={emailForm.body}
+              onChange={e => setEmailForm({ ...emailForm, body: e.target.value })}
+            />
+            <div className="modal-actions">
+              <button className="assign-btn" onClick={handleSendEmail} disabled={sending}>
+                {sending ? 'Sending...' : 'Send Email'}
+              </button>
+              <button className="clear-btn" onClick={() => setEmailModal(null)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
