@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import API from '../api';
+import Toast from '../components/Toast';
 import './Jobs.css';
 
 const Jobs = () => {
@@ -9,7 +10,10 @@ const Jobs = () => {
     title: '', description: '', required_skills: '', required_experience_years: 0, required_education: ''
   });
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState(null);
   const navigate = useNavigate();
+
+  const showToast = (message, type = 'success') => setToast({ message, type });
 
   const fetchJobs = async () => {
     const res = await API.get('/jobs/');
@@ -29,8 +33,9 @@ const Jobs = () => {
       });
       setForm({ title: '', description: '', required_skills: '', required_experience_years: 0, required_education: '' });
       fetchJobs();
+      showToast('Job created successfully!', 'success');
     } catch (err) {
-      console.error(err);
+      showToast('Failed to create job.', 'error');
     }
     setLoading(false);
   };
@@ -40,8 +45,13 @@ const Jobs = () => {
     try {
       await API.delete(`/jobs/${id}`);
       setJobs(jobs.filter(j => j.id !== id));
+      showToast('Job deleted successfully.', 'success');
     } catch (err) {
-      console.error(err);
+      if (err.response?.status === 403) {
+        showToast('You can only delete your own job postings.', 'error');
+      } else {
+        showToast('Failed to delete job.', 'error');
+      }
     }
   };
 
@@ -83,6 +93,14 @@ const Jobs = () => {
           </div>
         ))}
       </div>
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 };

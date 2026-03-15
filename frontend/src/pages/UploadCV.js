@@ -7,6 +7,7 @@ const UploadCV = () => {
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleUpload = async (e) => {
     e.preventDefault();
@@ -14,6 +15,7 @@ const UploadCV = () => {
     setLoading(true);
     setStatus('');
     setResult(null);
+    setErrorMessage('');
 
     const formData = new FormData();
     formData.append('file', file);
@@ -26,6 +28,13 @@ const UploadCV = () => {
       setStatus('success');
     } catch (err) {
       setStatus('error');
+      if (err.response?.status === 409) {
+        setErrorMessage(err.response.data.detail);
+      } else if (err.response?.status === 400) {
+        setErrorMessage(err.response.data.detail);
+      } else {
+        setErrorMessage('Upload failed. Please try again.');
+      }
     }
     setLoading(false);
   };
@@ -46,11 +55,13 @@ const UploadCV = () => {
           </button>
         </form>
 
-        {status === 'error' && <p className="error">Upload failed. Please try again.</p>}
+        {status === 'error' && (
+          <p className="error-msg">{errorMessage}</p>
+        )}
 
-        {result && (
+        {status === 'success' && result && (
           <div className="result">
-            <h3>Parsed Successfully!</h3>
+            <h3>✅ Parsed Successfully!</h3>
             <p><strong>Name:</strong> {result.full_name || 'Not detected'}</p>
             <p><strong>Email:</strong> {result.email || 'Not detected'}</p>
             <p><strong>Phone:</strong> {result.phone || 'Not detected'}</p>

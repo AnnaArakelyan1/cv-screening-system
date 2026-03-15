@@ -33,7 +33,9 @@ import Dashboard from './pages/Dashboard';
 import UploadCV from './pages/UploadCV';
 import Jobs from './pages/Jobs';
 import MatchResults from './pages/MatchResults';
+import Profile from './pages/Profile';
 import Navbar from './components/Navbar';
+
 
 const PrivateRoute = ({ children }) => {
   const { user } = useAuth();
@@ -52,6 +54,7 @@ function AppRoutes() {
         <Route path="/upload" element={<PrivateRoute><UploadCV /></PrivateRoute>} />
         <Route path="/jobs" element={<PrivateRoute><Jobs /></PrivateRoute>} />
         <Route path="/jobs/:id/match" element={<PrivateRoute><MatchResults /></PrivateRoute>} />
+        <Route path="/profile" element={<Profile />} />
       </Routes>
     </>
   );

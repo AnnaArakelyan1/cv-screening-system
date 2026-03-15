@@ -219,7 +219,6 @@
 .status-badge.accepted { background: #e8f8f0; color: #1a8a4a; }
 .status-badge.rejected { background: #fde8e8; color: #e74c3c; }
 
-/* Score Box */
 .score-box {
   text-align: center;
   min-width: 110px;
@@ -250,7 +249,6 @@
   margin-top: 2px;
 }
 
-/* Score Breakdown */
 .score-breakdown {
   margin-top: 0.6rem;
   font-size: 0.72rem;
@@ -272,9 +270,24 @@
   font-size: 0.72rem;
 }
 
-/* Unassign Button */
-.unassign-btn {
+.email-btn {
   margin-top: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  background: none;
+  border: 1px solid #2980b9;
+  color: #2980b9;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  width: 100%;
+}
+
+.email-btn:hover {
+  background: #eaf4fb;
+}
+
+.unassign-btn {
+  margin-top: 0.4rem;
   padding: 0.25rem 0.75rem;
   background: none;
   border: 1px solid #e74c3c;
@@ -287,4 +300,62 @@
 
 .unassign-btn:hover {
   background: #fde8e8;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  width: 500px;
+  max-width: 90%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+
+.modal h3 {
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.modal-to {
+  color: #888;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.modal input {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
+.modal textarea {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.75rem;
 }
