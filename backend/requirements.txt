@@ -13,3 +13,4 @@ python-docx
 spacy
 scikit-learn
 numpy
+deep-translator
