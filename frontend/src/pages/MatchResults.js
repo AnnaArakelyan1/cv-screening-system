@@ -168,7 +168,7 @@ const MatchResults = () => {
 
       <div className="assign-box">
         <div className="assign-box-header">
-          <h3>🎯 Assign Candidates to this Job</h3>
+          <h3>Assign Candidates to this Job</h3>
           <p>Select candidates from the list below and assign them to this job posting.</p>
         </div>
         <div className="assign-actions">

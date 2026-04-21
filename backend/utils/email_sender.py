@@ -11,7 +11,7 @@ def send_email(to_email: str, subject: str, body: str):
     msg["From"] = settings.MAIL_EMAIL
     msg["To"] = to_email
     msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain"))
+    msg.attach(MIMEText(body, "plain")) 
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(settings.MAIL_EMAIL, settings.MAIL_PASSWORD)

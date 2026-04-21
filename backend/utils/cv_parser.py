@@ -60,12 +60,48 @@ def extract_skills(text: str):
     text_lower = text.lower()
     return [skill for skill in SKILLS_KEYWORDS if skill in text_lower]
 
-def extract_name(text: str):
+# def extract_name(text: str):
+#     doc = nlp(text[:500])
+#     for ent in doc.ents:
+#         if ent.label_ == "PERSON":
+#             return ent.text
+#     return None
+
+def extract_name(text: str, original_text: str = None):
+    # Նախ փորձենք spaCy-ով (translated text-ի վրա)
     doc = nlp(text[:500])
     for ent in doc.ents:
         if ent.label_ == "PERSON":
             return ent.text
+    
+    # Եթե չգտավ, վերցնենք original text-ի առաջին non-empty տողը
+    if original_text:
+        for line in original_text.split("\n"):
+            line = line.strip()
+            # Բաց թողնենք email, phone, կարճ տողեր
+            if line and len(line) > 2 and len(line) < 60:
+                if "@" not in line and not re.match(r'^[\d\s\+\-\(\)]+$', line):
+                    return line
     return None
+
+# SKILL_EMBEDDINGS = {
+#     "python": model.encode("python programming"),
+#     "machine learning": model.encode("machine learning ML AI"),
+#     "javascript": model.encode("javascript JS frontend")
+    
+# }
+
+# def extract_skills_semantic(text: str):
+#     text_embedding = model.encode(text)
+#     found_skills = []
+#     for skill, skill_emb in SKILL_EMBEDDINGS.items():
+#         similarity = cosine_similarity(text_embedding, skill_emb)
+#         if similarity > 0.6: 
+#             found_skills.append(skill)
+#     return found_skills
+
+
+
 
 def extract_section(text: str, section_keywords: list, next_section_keywords: list) -> str:
     lines = text.split("\n")
@@ -93,6 +129,41 @@ def extract_section(text: str, section_keywords: list, next_section_keywords: li
 
     return " | ".join(section_lines[:10]) if section_lines else None
 
+# def parse_cv(file_bytes: bytes, filename: str) -> dict:
+#     if filename.endswith(".pdf"):
+#         raw_text = extract_text_from_pdf(file_bytes)
+#     elif filename.endswith(".docx"):
+#         raw_text = extract_text_from_docx(file_bytes)
+#     else:
+#         raw_text = file_bytes.decode("utf-8", errors="ignore")
+
+
+#     lang = detect_language(raw_text)
+#     if lang == 'hy':
+#         parsed_text = translate_to_english(raw_text)
+#     else:
+#         parsed_text = raw_text
+
+
+#     email = extract_email(raw_text)
+#     phone = extract_phone(raw_text)
+
+#     name = extract_name(parsed_text, original_text=raw_text)
+#     skills = extract_skills(parsed_text)
+#     education = extract_section(parsed_text, EDUCATION_KEYWORDS, EXPERIENCE_KEYWORDS)
+#     experience = extract_section(parsed_text, EXPERIENCE_KEYWORDS, EDUCATION_KEYWORDS)
+
+#     return {
+#         "full_name": name,
+#         "email": email,
+#         "phone": phone,
+#         "skills": skills,
+#         "education": education,
+#         "experience": experience,
+#         "raw_text": parsed_text,  
+#     }
+
+
 def parse_cv(file_bytes: bytes, filename: str) -> dict:
     if filename.endswith(".pdf"):
         raw_text = extract_text_from_pdf(file_bytes)
@@ -101,21 +172,13 @@ def parse_cv(file_bytes: bytes, filename: str) -> dict:
     else:
         raw_text = file_bytes.decode("utf-8", errors="ignore")
 
-
-    lang = detect_language(raw_text)
-    if lang == 'hy':
-        parsed_text = translate_to_english(raw_text)
-    else:
-        parsed_text = raw_text
-
-
+    # Translation հանել - multilingual model-ն ուղղակի հայերեն կհասկանա
     email = extract_email(raw_text)
     phone = extract_phone(raw_text)
-
-    name = extract_name(parsed_text)
-    skills = extract_skills(parsed_text)
-    education = extract_section(parsed_text, EDUCATION_KEYWORDS, EXPERIENCE_KEYWORDS)
-    experience = extract_section(parsed_text, EXPERIENCE_KEYWORDS, EDUCATION_KEYWORDS)
+    name = extract_name(raw_text, original_text=raw_text)  # raw_text-ով
+    skills = extract_skills(raw_text)
+    education = extract_section(raw_text, EDUCATION_KEYWORDS, EXPERIENCE_KEYWORDS)
+    experience = extract_section(raw_text, EXPERIENCE_KEYWORDS, EDUCATION_KEYWORDS)
 
     return {
         "full_name": name,
@@ -124,5 +187,5 @@ def parse_cv(file_bytes: bytes, filename: str) -> dict:
         "skills": skills,
         "education": education,
         "experience": experience,
-        "raw_text": parsed_text,  
+        "raw_text": raw_text,  # հայերեն տեքստը ուղղակի
     }

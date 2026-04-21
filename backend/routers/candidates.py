@@ -27,7 +27,6 @@ async def upload_cv(
     parsed = parse_cv(file_bytes, file.filename)
     embedding = get_embedding(parsed["raw_text"])
 
-    # Check for duplicate email
     if parsed.get("email"):
         existing = db.query(Candidate).filter(Candidate.email == parsed["email"]).first()
         if existing:
@@ -52,7 +51,7 @@ async def upload_cv(
     db.commit()
     db.refresh(candidate)
 
-    # Send one email with match scores across all jobs
+
     if candidate.email and candidate.embedding:
         try:
             jobs = db.query(Job).filter(Job.embedding != None).all()

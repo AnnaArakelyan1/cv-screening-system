@@ -1,7 +1,8 @@
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
+model = SentenceTransformer("paraphrase-multilingual-mpnet-base-v2")
+
 
 EDUCATION_LEVELS = {
     "high school": 1,
