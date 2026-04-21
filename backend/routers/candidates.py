@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from database import get_db
 from models.candidate import Candidate
@@ -6,11 +7,16 @@ from models.job import Job
 from models.user import User
 from schemas.candidate import CandidateOut
 from utils.auth import get_current_user
-from utils.cv_parser import parse_cv
+from utils.cv_parser import parse_cv, is_likely_cv
 from utils.matcher import get_embedding, cluster_candidates, calculate_match_score
 from utils.email_sender import send_email
 from typing import List
+from pathlib import Path
 import logging
+import uuid
+
+UPLOAD_DIR = Path("/app/uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
 
 router = APIRouter()
 
@@ -25,6 +31,10 @@ async def upload_cv(
 
     file_bytes = await file.read()
     parsed = parse_cv(file_bytes, file.filename)
+
+    if not is_likely_cv(parsed):
+        raise HTTPException(status_code=400, detail="The uploaded file does not appear to be a CV")
+
     embedding = get_embedding(parsed["raw_text"])
 
     if parsed.get("email"):
@@ -35,6 +45,10 @@ async def upload_cv(
                 detail=f"A candidate with email {parsed['email']} already exists (ID: {existing.id}, Name: {existing.full_name})"
             )
 
+    ext = Path(file.filename).suffix
+    stored_filename = f"{uuid.uuid4().hex}{ext}"
+    (UPLOAD_DIR / stored_filename).write_bytes(file_bytes)
+
     candidate = Candidate(
         full_name=parsed["full_name"],
         email=parsed["email"],
@@ -43,7 +57,7 @@ async def upload_cv(
         education=parsed.get("education"),
         experience=parsed.get("experience"),
         raw_text=parsed["raw_text"],
-        cv_filename=file.filename,
+        cv_filename=stored_filename,
         embedding=embedding,
         uploaded_by=current_user.id
     )
@@ -133,6 +147,26 @@ def cluster_all_candidates(
     db.commit()
     return {"message": f"Clustered {len(candidates)} candidates into groups"}
 
+@router.get("/{candidate_id}/cv")
+def download_cv(
+    candidate_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    if not candidate.cv_filename:
+        raise HTTPException(status_code=404, detail="No CV file stored for this candidate")
+    path = UPLOAD_DIR / candidate.cv_filename
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="CV file not found on server")
+    return FileResponse(
+        path=str(path),
+        filename=candidate.cv_filename,
+        media_type="application/octet-stream"
+    )
+
 @router.get("/{candidate_id}", response_model=CandidateOut)
 def get_candidate(
     candidate_id: int,
@@ -153,7 +187,7 @@ def delete_candidate(
     candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
-    if candidate.uploaded_by != current_user.id:
+    if not current_user.is_admin and candidate.uploaded_by != current_user.id:
         raise HTTPException(status_code=403, detail="You can only delete candidates you uploaded")
     db.delete(candidate)
     db.commit()

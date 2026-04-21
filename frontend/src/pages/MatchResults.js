@@ -3,6 +3,20 @@ import { useParams, useNavigate } from 'react-router-dom';
 import API from '../api';
 import './MatchResults.css';
 
+const downloadCV = async (candidateId, filename) => {
+  try {
+    const res = await API.get(`/candidates/${candidateId}/cv`, { responseType: 'blob' });
+    const url = URL.createObjectURL(res.data);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || `cv_${candidateId}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    alert('CV file not available.');
+  }
+};
+
 const MatchResults = () => {
   const { id } = useParams();
   const [results, setResults] = useState([]);
@@ -65,6 +79,19 @@ const MatchResults = () => {
     setSelected([]);
     setAssigning(false);
     alert(`Successfully assigned ${success} candidate(s).`);
+  };
+
+  const handleStatusChange = async (candidateId, status) => {
+    try {
+      const appsRes = await API.get(`/applications/job/${id}`);
+      const application = appsRes.data.find(a => a.candidate_id === candidateId);
+      if (!application) return;
+      await API.patch(`/applications/${application.id}/status?status=${status}`);
+      const res = await API.get(`/jobs/${id}/match`);
+      setResults(res.data.results);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleUnassign = async (candidateId) => {
@@ -144,12 +171,38 @@ const MatchResults = () => {
           <div className="breakdown-years">{r.candidate_years} yrs exp</div>
         )}
       </div>
+      {r.candidate.cv_filename && (
+        <button
+          className="email-btn"
+          onClick={(e) => { e.stopPropagation(); downloadCV(r.candidate.id, r.candidate.cv_filename); }}
+        >
+          ↓ CV
+        </button>
+      )}
       <button
         className="email-btn"
         onClick={(e) => { e.stopPropagation(); openEmailModal(r.candidate); }}
       >
         ✉ Email
       </button>
+      {showUnassign && (
+        <div className="status-actions">
+          <button
+            className={`status-action-btn accept-btn ${r.application_status === 'accepted' ? 'active' : ''}`}
+            onClick={() => handleStatusChange(r.candidate.id, 'accepted')}
+            disabled={r.application_status === 'accepted'}
+          >
+            ✓ Accept
+          </button>
+          <button
+            className={`status-action-btn reject-btn ${r.application_status === 'rejected' ? 'active' : ''}`}
+            onClick={() => handleStatusChange(r.candidate.id, 'rejected')}
+            disabled={r.application_status === 'rejected'}
+          >
+            ✕ Reject
+          </button>
+        </div>
+      )}
       {showUnassign && (
         <button className="unassign-btn" onClick={() => handleUnassign(r.candidate.id)}>
           Unassign

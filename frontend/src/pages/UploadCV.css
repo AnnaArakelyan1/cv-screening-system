@@ -1,9 +1,9 @@
 .upload-box {
-  background: white;
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
   padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  max-width: 600px;
+  max-width: 560px;
 }
 
 .upload-box form {
@@ -13,44 +13,75 @@
 }
 
 .upload-box input[type="file"] {
-  padding: 0.5rem;
-  border: 2px dashed #ddd;
-  border-radius: 4px;
+  display: none;
 }
 
-.upload-box button {
-  padding: 0.75rem;
-  background: #27ae60;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 1rem;
+.upload-file-label {
+  display: block;
+  padding: 2rem;
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  text-align: center;
   cursor: pointer;
+  color: var(--muted);
+  font-size: 0.95rem;
+  transition: border-color 0.2s, background 0.2s;
 }
 
-.upload-box button:disabled {
-  background: #95a5a6;
+.upload-file-label:hover {
+  border-color: var(--primary);
+  background: #eff6ff;
+  color: var(--primary);
+}
+
+.upload-file-label.has-file {
+  border-color: var(--success);
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.upload-box button[type="submit"] {
+  padding: 0.75rem;
+  background: var(--success);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.upload-box button[type="submit"]:hover:not(:disabled) { opacity: 0.88; }
+.upload-box button[type="submit"]:disabled { background: #94a3b8; cursor: not-allowed; }
+
+.error-msg {
+  color: var(--danger);
+  font-size: 0.88rem;
+  padding: 0.75rem 1rem;
+  background: #fef2f2;
+  border-radius: 8px;
+  border-left: 3px solid var(--danger);
 }
 
 .result {
-  margin-top: 1.5rem;
-  padding: 1rem;
-  background: #f0fff4;
-  border-radius: 4px;
-  border-left: 4px solid #27ae60;
+  margin-top: 1.25rem;
+  padding: 1.25rem 1.5rem;
+  background: #f0fdf4;
+  border-radius: 10px;
+  border-left: 4px solid var(--success);
 }
 
-.skills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-top: 0.5rem;
+.result h3 {
+  color: #15803d;
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
 }
 
-.skill-tag {
-  background: #e8f4fd;
-  color: #2980b9;
-  padding: 0.2rem 0.6rem;
-  border-radius: 12px;
-  font-size: 0.8rem;
+.result p {
+  font-size: 0.9rem;
+  color: var(--text);
+  margin: 0.3rem 0;
 }
+
+.result strong { color: var(--navy); }

@@ -3,12 +3,27 @@ import API from '../api';
 import Toast from '../components/Toast';
 import './Dashboard.css';
 
+const downloadCV = async (candidateId, filename) => {
+  try {
+    const res = await API.get(`/candidates/${candidateId}/cv`, { responseType: 'blob' });
+    const url = URL.createObjectURL(res.data);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || `cv_${candidateId}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    alert('CV file not available.');
+  }
+};
+
 const Dashboard = () => {
   const [candidates, setCandidates] = useState([]);
   const [allCandidates, setAllCandidates] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
+  const [stats, setStats] = useState({ total: 0, openJobs: 0, newThisWeek: 0 });
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -17,9 +32,19 @@ const Dashboard = () => {
   const fetchCandidates = async () => {
     setLoading(true);
     try {
-      const res = await API.get('/candidates/');
-      setCandidates(res.data);
-      setAllCandidates(res.data);
+      const [candidatesRes, jobsRes] = await Promise.all([
+        API.get('/candidates/'),
+        API.get('/jobs/')
+      ]);
+      const allC = candidatesRes.data;
+      setCandidates(allC);
+      setAllCandidates(allC);
+
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      const newThisWeek = allC.filter(c => new Date(c.uploaded_at) >= weekAgo).length;
+      const openJobs = jobsRes.data.filter(j => j.is_open).length;
+      setStats({ total: allC.length, openJobs, newThisWeek });
     } catch (err) {
       console.error(err);
     }
@@ -73,6 +98,31 @@ const Dashboard = () => {
   return (
     <div className="page">
       <h1>Candidates</h1>
+
+      <div className="stats-row">
+        <div className="stat-card">
+          <div className="stat-icon stat-icon--blue">👥</div>
+          <div>
+            <div className="stat-value">{stats.total}</div>
+            <div className="stat-label">Total Candidates</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon stat-icon--green">💼</div>
+          <div>
+            <div className="stat-value">{stats.openJobs}</div>
+            <div className="stat-label">Open Jobs</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon stat-icon--purple">✨</div>
+          <div>
+            <div className="stat-value">{stats.newThisWeek}</div>
+            <div className="stat-label">New This Week</div>
+          </div>
+        </div>
+      </div>
+
       <form onSubmit={handleSearch} className="search-bar">
         <input
           type="text"
@@ -113,6 +163,11 @@ const Dashboard = () => {
                 <p className="cluster">Cluster: {c.cluster_id}</p>
               )}
               <p className="date">Uploaded: {new Date(c.uploaded_at).toLocaleDateString()}</p>
+              {c.cv_filename && (
+                <button className="download-btn" onClick={() => downloadCV(c.id, c.cv_filename)}>
+                  Download CV
+                </button>
+              )}
               <button className="delete-btn" onClick={() => handleDelete(c.id)}>Delete</button>
             </div>
           ))}

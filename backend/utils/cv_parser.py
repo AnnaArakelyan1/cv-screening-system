@@ -2,21 +2,68 @@ import fitz  # PyMuPDF
 import docx
 import re
 import spacy
-from deep_translator import GoogleTranslator
 
 nlp = spacy.load("en_core_web_sm")
 
 SKILLS_KEYWORDS = [
-    "python", "java", "javascript", "react", "fastapi", "django", "sql",
-    "postgresql", "docker", "machine learning", "deep learning", "nlp",
-    "data analysis", "tensorflow", "pytorch", "aws", "git", "html", "css",
-    "node.js", "typescript", "mongodb", "redis", "kubernetes", "c++", "c#",
-    "scikit-learn", "pandas", "numpy", "matplotlib", "rest api", "flask",
-    "mysql", "linux", "tailwind", "github", "ci/cd", "agile", "scrum"
+    # Languages
+    "python", "java", "javascript", "typescript", "c++", "c#", "c", "go", "rust",
+    "kotlin", "swift", "ruby", "php", "scala", "r", "matlab",
+    # Web / Frameworks
+    "react", "angular", "vue", "next.js", "node.js", "fastapi", "django", "flask",
+    "spring", "express", "tailwind", "html", "css",
+    # Data / ML
+    "machine learning", "deep learning", "nlp", "data analysis", "tensorflow",
+    "pytorch", "scikit-learn", "pandas", "numpy", "matplotlib", "seaborn",
+    "huggingface", "transformers", "computer vision", "llm",
+    # Databases
+    "sql", "postgresql", "mysql", "mongodb", "redis", "sqlite", "elasticsearch",
+    "cassandra", "dynamodb", "oracle",
+    # Cloud / Infra
+    "aws", "azure", "gcp", "docker", "kubernetes", "linux", "terraform",
+    "ansible", "nginx", "apache",
+    # Tools / Practices
+    "git", "github", "gitlab", "ci/cd", "rest api", "graphql", "grpc",
+    "microservices", "agile", "scrum", "jira", "figma",
 ]
 
-EDUCATION_KEYWORDS = ["education", "academic", "qualification", "degree", "university", "college", "bachelor", "master", "phd"]
-EXPERIENCE_KEYWORDS = ["experience", "employment", "work history", "career", "professional background", "positions held"]
+EDUCATION_KEYWORDS = [
+    "education", "academic", "qualification", "degree", "university", "college", "bachelor", "master", "phd",
+    "կրթություն", "կրթ", "բակալավր", "մագիստր", "դիպլոմ", "համալսարան",
+]
+EXPERIENCE_KEYWORDS = [
+    "experience", "employment", "work history", "career", "professional background", "positions held",
+    "աշխատանքային փորձ", "աշխատանք", "փորձ",
+]
+SKILLS_SECTION_KEYWORDS = [
+    "skills", "technical skills", "technologies", "tools", "competencies", "expertise", "stack",
+    "հմտություններ", "հմտ",
+]
+
+def is_likely_cv(parsed: dict) -> bool:
+    signals = 0
+    if parsed.get("email"):
+        signals += 2
+    if parsed.get("phone"):
+        signals += 1
+    if parsed.get("skills"):
+        signals += 2
+    if parsed.get("experience"):
+        signals += 2
+    if parsed.get("education"):
+        signals += 2
+    text = (parsed.get("raw_text") or "").lower()
+    if len(text.split()) < 30:
+        return False
+    cv_hints = [
+        "experience", "education", "skills", "work", "university", "degree",
+        "developer", "engineer", "manager", "analyst", "resume", "cv",
+        "աշխատանք", "կրթություն", "հմտություններ", "փորձ",
+    ]
+    for hint in cv_hints:
+        if hint in text:
+            signals += 1
+    return signals >= 4
 
 def detect_language(text: str) -> str:
     """Detect if text contains Armenian characters."""
@@ -25,19 +72,7 @@ def detect_language(text: str) -> str:
     armenian_count = sum(1 for c in text_lower if c in armenian_chars)
     return 'hy' if armenian_count > 20 else 'en'
 
-def translate_to_english(text: str) -> str:
-    """Translate text to English if it's Armenian."""
-    try:
-       
-        chunks = [text[i:i+4500] for i in range(0, len(text), 4500)]
-        translated_chunks = []
-        for chunk in chunks:
-            if chunk.strip():
-                translated = GoogleTranslator(source='auto', target='en').translate(chunk)
-                translated_chunks.append(translated or chunk)
-        return '\n'.join(translated_chunks)
-    except Exception as e:
-        return text 
+
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
     doc = fitz.open(stream=file_bytes, filetype="pdf")
@@ -57,8 +92,41 @@ def extract_phone(text: str):
     return match[0] if match else None
 
 def extract_skills(text: str):
+    found = set()
     text_lower = text.lower()
-    return [skill for skill in SKILLS_KEYWORDS if skill in text_lower]
+
+    # 1. Match known keywords
+    for skill in SKILLS_KEYWORDS:
+        if skill.lower() in text_lower:
+            found.add(skill)
+
+    # 2. Extract anything listed in a dedicated skills section
+    lines = text.split('\n')
+    in_section = False
+    all_other_headers = EDUCATION_KEYWORDS + EXPERIENCE_KEYWORDS + [
+        "summary", "objective", "references", "certifications", "projects",
+        "languages", "ամփոփում", "նախագծեր",
+    ]
+
+    for line in lines:
+        stripped = line.strip()
+        lower = stripped.lower()
+
+        if any(kw in lower for kw in SKILLS_SECTION_KEYWORDS) and len(stripped) < 60:
+            in_section = True
+            continue
+
+        if in_section:
+            if not stripped:
+                continue
+            if any(kw in lower for kw in all_other_headers) and len(stripped) < 60:
+                break
+            for part in re.split(r'[,;|•·]+', stripped):
+                part = part.strip().strip('-').strip()
+                if part and 1 < len(part) < 50 and re.search(r'[a-zA-Z]', part):
+                    found.add(part)
+
+    return list(found)
 
 # def extract_name(text: str):
 #     doc = nlp(text[:500])

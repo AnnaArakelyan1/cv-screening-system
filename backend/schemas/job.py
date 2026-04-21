@@ -11,6 +11,7 @@ class JobCreate(BaseModel):
 
 class JobOut(JobCreate):
     id: int
+    is_open: bool = True
     created_at: datetime
 
     class Config:

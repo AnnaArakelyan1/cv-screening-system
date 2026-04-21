@@ -28,13 +28,9 @@ const UploadCV = () => {
       setStatus('success');
     } catch (err) {
       setStatus('error');
-      if (err.response?.status === 409) {
-        setErrorMessage(err.response.data.detail);
-      } else if (err.response?.status === 400) {
-        setErrorMessage(err.response.data.detail);
-      } else {
-        setErrorMessage('Upload failed. Please try again.');
-      }
+      setErrorMessage(
+        err.response?.data?.detail || 'Upload failed. Please try again.'
+      );
     }
     setLoading(false);
   };
@@ -45,12 +41,16 @@ const UploadCV = () => {
       <div className="upload-box">
         <form onSubmit={handleUpload}>
           <input
+            id="cv-upload"
             type="file"
             accept=".pdf,.docx"
             onChange={e => setFile(e.target.files[0])}
             required
           />
-          <button type="submit" disabled={loading}>
+          <label htmlFor="cv-upload" className={`upload-file-label ${file ? 'has-file' : ''}`}>
+            {file ? `✓  ${file.name}` : '📄  Choose a PDF or DOCX file'}
+          </label>
+          <button type="submit" disabled={loading || !file}>
             {loading ? 'Processing...' : 'Upload & Analyze'}
           </button>
         </form>
@@ -61,11 +61,11 @@ const UploadCV = () => {
 
         {status === 'success' && result && (
           <div className="result">
-            <h3>✅ Parsed Successfully!</h3>
+            <h3>Parsed Successfully</h3>
             <p><strong>Name:</strong> {result.full_name || 'Not detected'}</p>
             <p><strong>Email:</strong> {result.email || 'Not detected'}</p>
             <p><strong>Phone:</strong> {result.phone || 'Not detected'}</p>
-            <p><strong>Skills:</strong></p>
+            <p><strong>Skills detected:</strong></p>
             <div className="skills">
               {(result.skills || []).map(s => (
                 <span key={s} className="skill-tag">{s}</span>

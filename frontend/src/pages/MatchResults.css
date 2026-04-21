@@ -286,6 +286,39 @@
   background: #eaf4fb;
 }
 
+.status-actions {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.status-action-btn {
+  flex: 1;
+  padding: 0.25rem 0.4rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1.5px solid;
+  transition: background 0.15s;
+}
+
+.accept-btn {
+  background: none;
+  border-color: #27ae60;
+  color: #27ae60;
+}
+.accept-btn:hover:not(:disabled) { background: #e8f8f0; }
+.accept-btn.active, .accept-btn:disabled { background: #27ae60; color: white; cursor: default; }
+
+.reject-btn {
+  background: none;
+  border-color: #e74c3c;
+  color: #e74c3c;
+}
+.reject-btn:hover:not(:disabled) { background: #fde8e8; }
+.reject-btn.active, .reject-btn:disabled { background: #e74c3c; color: white; cursor: default; }
+
 .unassign-btn {
   margin-top: 0.4rem;
   padding: 0.25rem 0.75rem;

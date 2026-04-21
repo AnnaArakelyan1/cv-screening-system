@@ -1,7 +1,25 @@
 import numpy as np
+import threading
 from sentence_transformers import SentenceTransformer
 
-model = SentenceTransformer("paraphrase-multilingual-mpnet-base-v2")
+_model = None
+_model_lock = threading.Lock()
+
+def get_model():
+    global _model
+    if _model is None:
+        with _model_lock:
+            if _model is None:
+                _model = SentenceTransformer("paraphrase-multilingual-mpnet-base-v2")
+    return _model
+
+def _preload():
+    try:
+        get_model()
+    except Exception:
+        pass
+
+threading.Thread(target=_preload, daemon=True).start()
 
 
 EDUCATION_LEVELS = {
@@ -9,15 +27,18 @@ EDUCATION_LEVELS = {
     "associate": 2,
     "bachelor": 3,
     "undergraduate": 3,
+    "բակալավր": 3,
     "master": 4,
+    "մագիստր": 4,
     "msc": 4,
     "mba": 4,
     "phd": 5,
     "doctorate": 5,
+    "դոկտոր": 5,
 }
 
 def get_embedding(text: str) -> list:
-    return model.encode(text).tolist()
+    return get_model().encode(text).tolist()
 
 def cosine_similarity(vec1, vec2) -> float:
     v1 = np.array(vec1)

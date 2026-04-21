@@ -11,7 +11,15 @@ const Jobs = () => {
   });
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
   const navigate = useNavigate();
+
+  const copyLink = (jobId) => {
+    const link = `${window.location.origin}/apply/${jobId}`;
+    navigator.clipboard.writeText(link);
+    setCopiedId(jobId);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   const showToast = (message, type = 'success') => setToast({ message, type });
 
@@ -38,6 +46,15 @@ const Jobs = () => {
       showToast('Failed to create job.', 'error');
     }
     setLoading(false);
+  };
+
+  const handleToggle = async (id) => {
+    try {
+      const res = await API.patch(`/jobs/${id}/toggle`);
+      setJobs(jobs.map(j => j.id === id ? { ...j, is_open: res.data.is_open } : j));
+    } catch {
+      showToast('Failed to update job status.', 'error');
+    }
   };
 
   const handleDelete = async (id) => {
@@ -79,13 +96,27 @@ const Jobs = () => {
       <div className="job-list">
         {jobs.map(job => (
           <div className="job-card" key={job.id}>
-            <h3>{job.title}</h3>
+            <div className="job-card-header">
+              <h3>{job.title}</h3>
+              <span className={`job-status ${job.is_open ? 'open' : 'closed'}`}>
+                {job.is_open ? 'Open' : 'Closed'}
+              </span>
+            </div>
             <p>{job.description}</p>
             <div className="skills">
               {(job.required_skills || []).map(s => <span key={s} className="skill-tag">{s}</span>)}
             </div>
+            <div className="apply-link-row">
+              <code className="apply-link">{window.location.origin}/apply/{job.id}</code>
+              <button className="copy-btn" onClick={() => copyLink(job.id)}>
+                {copiedId === job.id ? 'Copied!' : 'Copy Link'}
+              </button>
+            </div>
             <button onClick={() => navigate(`/jobs/${job.id}/match`)}>
               View Matched Candidates
+            </button>
+            <button className={`toggle-btn ${job.is_open ? 'btn-close' : 'btn-open'}`} onClick={() => handleToggle(job.id)}>
+              {job.is_open ? 'Close Job' : 'Reopen Job'}
             </button>
             <button className="delete-btn" onClick={() => handleDelete(job.id)}>
               Delete

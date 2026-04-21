@@ -1,109 +1,151 @@
-.page {
-  padding: 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-bottom: 2rem;
 }
 
-.page h1 {
-  color: #2c3e50;
-  margin-bottom: 1.5rem;
+.stat-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.stat-icon--blue  { background: #dbeafe; }
+.stat-icon--green { background: #dcfce7; }
+.stat-icon--purple{ background: #ede9fe; }
+
+.stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--navy);
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 0.25rem;
 }
 
 .search-bar {
   display: flex;
-  gap: 0.75rem;
-  margin-bottom: 2rem;
+  gap: 0.6rem;
+  margin-bottom: 1.75rem;
+  max-width: 600px;
 }
 
 .search-bar input {
   flex: 1;
-  padding: 0.6rem 1rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 0.95rem;
+  max-width: unset;
 }
 
 .search-bar button {
-  padding: 0.6rem 1.2rem;
-  background: #2c3e50;
-  color: white;
+  padding: 0.65rem 1.25rem;
+  background: var(--primary);
+  color: #fff;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.search-bar button:hover { background: var(--primary-dark); }
+
+.search-bar button[type="button"] {
+  background: var(--bg);
+  color: var(--muted);
+  border: 1.5px solid var(--border);
+}
+
+.search-bar button[type="button"]:hover { background: #e2e8f0; color: var(--text); }
+
+.results-count {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 1rem;
 }
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 1.25rem;
 }
 
 .card {
-  background: white;
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
   padding: 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transition: box-shadow 0.2s, transform 0.2s;
+  border-top: 3px solid transparent;
+}
+
+.card:hover {
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+  border-top-color: var(--primary);
 }
 
 .card h3 {
-  margin-bottom: 0.5rem;
-  color: #2c3e50;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--navy);
+  margin-bottom: 0.4rem;
 }
 
 .card p {
-  color: #666;
-  font-size: 0.9rem;
-  margin: 0.2rem 0;
-}
-
-.skills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin: 0.75rem 0;
-}
-
-.skill-tag {
-  background: #e8f4fd;
-  color: #2980b9;
-  padding: 0.2rem 0.6rem;
-  border-radius: 12px;
-  font-size: 0.8rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0.15rem 0;
 }
 
 .cluster {
-  color: #8e44ad !important;
-  font-weight: bold;
+  color: #7c3aed !important;
+  font-weight: 600 !important;
+  font-size: 0.8rem !important;
 }
 
 .date {
-  font-size: 0.8rem !important;
-  color: #aaa !important;
-  margin-top: 0.5rem !important;
+  font-size: 0.78rem !important;
+  color: #94a3b8 !important;
+  margin-top: 0.75rem !important;
 }
 
-.delete-btn {
-  background: #e74c3c;
-  color: white;
-  border: none;
-  padding: 0.4rem 1rem;
-  border-radius: 4px;
-  cursor: pointer;
-  margin-top: 0.5rem;
+.download-btn {
+  margin-top: 0.75rem;
   width: 100%;
+  padding: 0.4rem 1rem;
+  background: #eff6ff;
+  color: var(--primary);
+  border: 1.5px solid #bfdbfe;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: background 0.15s;
 }
+.download-btn:hover { background: #dbeafe; }
 
-.delete-btn:hover {
-  background: #c0392b;
-}
-
-.results-count {
-  color: #666;
-  font-size: 0.9rem;
-  margin-bottom: 1rem;
-}
-
-.skill-tag.highlighted {
-  background: #f39c12;
-  color: white;
+.card .delete-btn {
+  margin-top: 0.4rem;
+  width: 100%;
 }
