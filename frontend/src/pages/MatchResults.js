@@ -146,6 +146,13 @@ const MatchResults = () => {
     return { color: '#bdc3c7', fontSize: '1.4rem' };
   };
 
+  const matchLabel = (val) => {
+    if (val === 'exceeds') return { text: '↑ exceeds', color: '#27ae60' };
+    if (val === 'meets')   return { text: '✓ meets',   color: '#27ae60' };
+    if (val === 'below')   return { text: '↓ below',   color: '#e74c3c' };
+    return { text: '—', color: '#95a5a6' };
+  };
+
   const ScoreBox = ({ r, showUnassign }) => (
     <div className="score-box">
       <div className="score-circle" style={{ borderColor: getScoreColor(r.match_score) }}>
@@ -156,21 +163,33 @@ const MatchResults = () => {
       </div>
       <div className="score-breakdown">
         <div className="breakdown-row">
-          <span>Semantic</span>
-          <span style={{ color: getScoreColor(r.semantic_score) }}>{r.semantic_score}%</span>
-        </div>
-        <div className="breakdown-row">
           <span>Experience</span>
-          <span style={{ color: getScoreColor(r.experience_score) }}>{r.experience_score}%</span>
+          <span style={{ color: matchLabel(r.experience_match).color }}>
+            {matchLabel(r.experience_match).text}
+          </span>
         </div>
         <div className="breakdown-row">
           <span>Education</span>
-          <span style={{ color: getScoreColor(r.education_score) }}>{r.education_score}%</span>
+          <span style={{ color: matchLabel(r.education_match).color }}>
+            {matchLabel(r.education_match).text}
+          </span>
         </div>
-        {r.candidate_years > 0 && (
-          <div className="breakdown-years">{r.candidate_years} yrs exp</div>
-        )}
       </div>
+      {r.analysis && <p className="gemini-summary">{r.analysis}</p>}
+      {(r.matched_skills || []).length > 0 && (
+        <div className="skill-match-row">
+          {r.matched_skills.slice(0, 4).map(s => (
+            <span key={s} className="skill-match-tag matched">{s}</span>
+          ))}
+        </div>
+      )}
+      {(r.missing_skills || []).length > 0 && (
+        <div className="skill-match-row">
+          {r.missing_skills.slice(0, 3).map(s => (
+            <span key={s} className="skill-match-tag missing">{s}</span>
+          ))}
+        </div>
+      )}
       {r.candidate.cv_filename && (
         <button
           className="email-btn"

@@ -1,9 +1,16 @@
 import fitz  # PyMuPDF
 import docx
 import re
+import json
+import logging
 import spacy
+from google import genai
+from config import settings
 
+logger = logging.getLogger(__name__)
 nlp = spacy.load("en_core_web_sm")
+
+_gemini_client = genai.Client(api_key=settings.GOOGLE_API_KEY)
 
 SKILLS_KEYWORDS = [
     # Languages
@@ -28,17 +35,18 @@ SKILLS_KEYWORDS = [
 ]
 
 EDUCATION_KEYWORDS = [
-    "education", "academic", "qualification", "degree", "university", "college", "bachelor", "master", "phd",
-    "կրթություն", "կրթ", "բակալավր", "մագիստր", "դիպլոմ", "համալսարան",
+    "education", "academic", "qualification", "degree", "university", "college",
+    "bachelor", "master", "phd", "diploma", "institute", "school", "graduated",
 ]
 EXPERIENCE_KEYWORDS = [
-    "experience", "employment", "work history", "career", "professional background", "positions held",
-    "աշխատանքային փորձ", "աշխատանք", "փորձ",
+    "experience", "employment", "work history", "career", "professional background",
+    "positions held", "work experience", "professional experience",
 ]
 SKILLS_SECTION_KEYWORDS = [
-    "skills", "technical skills", "technologies", "tools", "competencies", "expertise", "stack",
-    "հմտություններ", "հմտ",
+    "skills", "technical skills", "technologies", "tools", "competencies",
+    "expertise", "stack", "core skills", "key skills",
 ]
+
 
 def is_likely_cv(parsed: dict) -> bool:
     signals = 0
@@ -58,54 +66,53 @@ def is_likely_cv(parsed: dict) -> bool:
     cv_hints = [
         "experience", "education", "skills", "work", "university", "degree",
         "developer", "engineer", "manager", "analyst", "resume", "cv",
-        "աշխատանք", "կրթություն", "հմտություններ", "փորձ",
     ]
     for hint in cv_hints:
-        if hint in text:
+        if re.search(r'\b' + hint + r'\b', text):
             signals += 1
     return signals >= 4
 
-def detect_language(text: str) -> str:
-    """Detect if text contains Armenian characters."""
-    armenian_chars = set('աբգդեզէըթժիլխծկհձղճմյնշոչպջռսվտրցւփքօֆ')
-    text_lower = text.lower()
-    armenian_count = sum(1 for c in text_lower if c in armenian_chars)
-    return 'hy' if armenian_count > 20 else 'en'
 
+def detect_language(text: str) -> str:
+    armenian_chars = set('abcdefghijklmnopqrstuvwxyz')
+    # simple heuristic: if few latin chars relative to total, likely non-latin
+    latin_count = sum(1 for c in text.lower() if c in armenian_chars)
+    return 'en' if latin_count > len(text) * 0.3 else 'hy'
 
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
     doc = fitz.open(stream=file_bytes, filetype="pdf")
     return "\n".join(page.get_text() for page in doc)
 
+
 def extract_text_from_docx(file_bytes: bytes) -> str:
     import io
     doc = docx.Document(io.BytesIO(file_bytes))
     return "\n".join(para.text for para in doc.paragraphs)
 
+
 def extract_email(text: str):
     match = re.findall(r"[\w\.-]+@[\w\.-]+\.\w+", text)
     return match[0] if match else None
+
 
 def extract_phone(text: str):
     match = re.findall(r"[\+\(]?[0-9][0-9\s\-\(\)]{7,}[0-9]", text)
     return match[0] if match else None
 
+
 def extract_skills(text: str):
     found = set()
     text_lower = text.lower()
 
-    # 1. Match known keywords
     for skill in SKILLS_KEYWORDS:
         if skill.lower() in text_lower:
             found.add(skill)
 
-    # 2. Extract anything listed in a dedicated skills section
     lines = text.split('\n')
     in_section = False
     all_other_headers = EDUCATION_KEYWORDS + EXPERIENCE_KEYWORDS + [
-        "summary", "objective", "references", "certifications", "projects",
-        "languages", "ամփոփում", "նախագծեր",
+        "summary", "objective", "references", "certifications", "projects", "languages",
     ]
 
     for line in lines:
@@ -121,54 +128,27 @@ def extract_skills(text: str):
                 continue
             if any(kw in lower for kw in all_other_headers) and len(stripped) < 60:
                 break
-            for part in re.split(r'[,;|•·]+', stripped):
+            for part in re.split(r'[,;|]+', stripped):
                 part = part.strip().strip('-').strip()
                 if part and 1 < len(part) < 50 and re.search(r'[a-zA-Z]', part):
                     found.add(part)
 
     return list(found)
 
-# def extract_name(text: str):
-#     doc = nlp(text[:500])
-#     for ent in doc.ents:
-#         if ent.label_ == "PERSON":
-#             return ent.text
-#     return None
 
 def extract_name(text: str, original_text: str = None):
-    # Նախ փորձենք spaCy-ով (translated text-ի վրա)
     doc = nlp(text[:500])
     for ent in doc.ents:
         if ent.label_ == "PERSON":
             return ent.text
-    
-    # Եթե չգտավ, վերցնենք original text-ի առաջին non-empty տողը
-    if original_text:
-        for line in original_text.split("\n"):
-            line = line.strip()
-            # Բաց թողնենք email, phone, կարճ տողեր
-            if line and len(line) > 2 and len(line) < 60:
-                if "@" not in line and not re.match(r'^[\d\s\+\-\(\)]+$', line):
-                    return line
+
+    source = original_text or text
+    for line in source.split("\n"):
+        line = line.strip()
+        if line and len(line) > 2 and len(line) < 60:
+            if "@" not in line and not re.match(r'^[\d\s\+\-\(\)]+$', line):
+                return line
     return None
-
-# SKILL_EMBEDDINGS = {
-#     "python": model.encode("python programming"),
-#     "machine learning": model.encode("machine learning ML AI"),
-#     "javascript": model.encode("javascript JS frontend")
-    
-# }
-
-# def extract_skills_semantic(text: str):
-#     text_embedding = model.encode(text)
-#     found_skills = []
-#     for skill, skill_emb in SKILL_EMBEDDINGS.items():
-#         similarity = cosine_similarity(text_embedding, skill_emb)
-#         if similarity > 0.6: 
-#             found_skills.append(skill)
-#     return found_skills
-
-
 
 
 def extract_section(text: str, section_keywords: list, next_section_keywords: list) -> str:
@@ -197,39 +177,73 @@ def extract_section(text: str, section_keywords: list, next_section_keywords: li
 
     return " | ".join(section_lines[:10]) if section_lines else None
 
-# def parse_cv(file_bytes: bytes, filename: str) -> dict:
-#     if filename.endswith(".pdf"):
-#         raw_text = extract_text_from_pdf(file_bytes)
-#     elif filename.endswith(".docx"):
-#         raw_text = extract_text_from_docx(file_bytes)
-#     else:
-#         raw_text = file_bytes.decode("utf-8", errors="ignore")
+
+def build_embedding_text(parsed: dict) -> str:
+    """Build focused text for embedding from structured CV fields."""
+    parts = []
+    if parsed.get("skills"):
+        parts.append("Skills: " + ", ".join(parsed["skills"]))
+    if parsed.get("experience"):
+        parts.append("Experience: " + str(parsed["experience"]))
+    if parsed.get("education"):
+        parts.append("Education: " + str(parsed["education"]))
+    if not parts:
+        return parsed.get("raw_text", "")
+    return " ".join(parts)
 
 
-#     lang = detect_language(raw_text)
-#     if lang == 'hy':
-#         parsed_text = translate_to_english(raw_text)
-#     else:
-#         parsed_text = raw_text
+def _gemini_parse(raw_text: str) -> dict:
+    """Step 1: Ask Gemini to extract structured CV fields from raw text."""
+    prompt = (
+        "You are a CV parser. Extract information from this CV and return ONLY valid JSON, "
+        "no markdown, no explanation.\n\n"
+        "Return this exact structure:\n"
+        '{\n'
+        '  "full_name": "candidate full name or null",\n'
+        '  "email": "email address or null",\n'
+        '  "phone": "phone number or null",\n'
+        '  "skills": ["list of ALL technical skills, tools, frameworks, languages, '
+        'databases, cloud platforms the candidate actually has"],\n'
+        '  "education": "education background as a single descriptive string (degree, institution, year), or null",\n'
+        '  "experience": "work experience as a single string (companies, roles, date ranges), or null"\n'
+        '}\n\n'
+        "Rules:\n"
+        "- Only include skills the candidate demonstrably has, not things they want to learn\n"
+        "- If a field is not found use null\n"
+        "- The CV may be in English or Armenian - handle both\n\n"
+        "CV TEXT:\n"
+        + raw_text[:8000]
+    )
 
-
-#     email = extract_email(raw_text)
-#     phone = extract_phone(raw_text)
-
-#     name = extract_name(parsed_text, original_text=raw_text)
-#     skills = extract_skills(parsed_text)
-#     education = extract_section(parsed_text, EDUCATION_KEYWORDS, EXPERIENCE_KEYWORDS)
-#     experience = extract_section(parsed_text, EXPERIENCE_KEYWORDS, EDUCATION_KEYWORDS)
-
-#     return {
-#         "full_name": name,
-#         "email": email,
-#         "phone": phone,
-#         "skills": skills,
-#         "education": education,
-#         "experience": experience,
-#         "raw_text": parsed_text,  
-#     }
+    import time
+    last_err = None
+    for attempt in range(5):
+        try:
+            response = _gemini_client.models.generate_content(model="gemini-2.5-flash-lite", contents=prompt)
+            text = response.text.strip()
+            text = re.sub(r'^```(?:json)?\s*', '', text)
+            text = re.sub(r'\s*```$', '', text)
+            data = json.loads(text)
+            return {
+                "full_name": data.get("full_name"),
+                "email": data.get("email"),
+                "phone": data.get("phone"),
+                "skills": data.get("skills") or [],
+                "education": data.get("education"),
+                "experience": data.get("experience"),
+            }
+        except Exception as e:
+            last_err = e
+            err_str = str(e)
+            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                wait = 15 * (attempt + 1)
+                logger.warning(f"Gemini rate limited during CV parse, retrying in {wait}s (attempt {attempt+1}/5)")
+                time.sleep(wait)
+            else:
+                break
+    logger.warning(f"Gemini CV parse failed: {last_err}")
+    return {"full_name": None, "email": None, "phone": None,
+            "skills": [], "education": None, "experience": None}
 
 
 def parse_cv(file_bytes: bytes, filename: str) -> dict:
@@ -240,20 +254,18 @@ def parse_cv(file_bytes: bytes, filename: str) -> dict:
     else:
         raw_text = file_bytes.decode("utf-8", errors="ignore")
 
-    # Translation հանել - multilingual model-ն ուղղակի հայերեն կհասկանա
-    email = extract_email(raw_text)
-    phone = extract_phone(raw_text)
-    name = extract_name(raw_text, original_text=raw_text)  # raw_text-ով
-    skills = extract_skills(raw_text)
-    education = extract_section(raw_text, EDUCATION_KEYWORDS, EXPERIENCE_KEYWORDS)
-    experience = extract_section(raw_text, EXPERIENCE_KEYWORDS, EDUCATION_KEYWORDS)
+    gemini = _gemini_parse(raw_text)
+
+    # Regex fallback for email/phone in case Gemini missed them
+    email = gemini["email"] or extract_email(raw_text)
+    phone = gemini["phone"] or extract_phone(raw_text)
 
     return {
-        "full_name": name,
+        "full_name": gemini["full_name"],
         "email": email,
         "phone": phone,
-        "skills": skills,
-        "education": education,
-        "experience": experience,
-        "raw_text": raw_text,  # հայերեն տեքստը ուղղակի
+        "skills": gemini["skills"],
+        "education": gemini["education"],
+        "experience": gemini["experience"],
+        "raw_text": raw_text,
     }

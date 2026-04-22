@@ -270,6 +270,40 @@
   font-size: 0.72rem;
 }
 
+.gemini-summary {
+  font-size: 0.72rem;
+  color: #555;
+  margin: 0.5rem 0 0.25rem;
+  line-height: 1.4;
+  max-width: 220px;
+  font-style: italic;
+}
+
+.skill-match-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 4px;
+  max-width: 220px;
+}
+
+.skill-match-tag {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.skill-match-tag.matched {
+  background: #d5f5e3;
+  color: #1e8449;
+}
+
+.skill-match-tag.missing {
+  background: #fde8e8;
+  color: #c0392b;
+}
+
 .email-btn {
   margin-top: 0.5rem;
   padding: 0.25rem 0.75rem;

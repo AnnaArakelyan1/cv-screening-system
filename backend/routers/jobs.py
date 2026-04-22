@@ -8,13 +8,14 @@ from models.match_result import MatchResult
 from models.application import Application
 from schemas.job import JobCreate, JobOut
 from utils.auth import get_current_user
-from utils.matcher import get_embedding, calculate_match_score
-from utils.cv_parser import parse_cv, is_likely_cv
+from utils.matcher import get_embedding, calculate_match_score, match_cv_with_gemini
+from utils.cv_parser import parse_cv, is_likely_cv, build_embedding_text, _gemini_parse
 from utils.email_sender import send_email
 from typing import List
 from pathlib import Path
 import logging
 import uuid
+import time
 
 UPLOAD_DIR = Path("/app/uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -54,19 +55,10 @@ def match_candidates(
     applications = db.query(Application).filter(Application.job_id == job_id).all()
     applied_candidate_ids = {app.candidate_id: app.status for app in applications}
 
-    candidates = db.query(Candidate).filter(Candidate.embedding != None).all()
+    candidates = db.query(Candidate).all()
     results = []
 
     for candidate in candidates:
-        scores = calculate_match_score(
-            candidate_embedding=candidate.embedding,
-            job_embedding=job.embedding,
-            candidate_experience_text=candidate.experience,
-            candidate_education_text=candidate.education,
-            required_experience_years=job.required_experience_years or 0,
-            required_education=job.required_education or "",
-        )
-
         is_applied = candidate.id in applied_candidate_ids
 
         existing = db.query(MatchResult).filter(
@@ -74,14 +66,75 @@ def match_candidates(
             MatchResult.job_id == job_id
         ).first()
 
-        if existing:
-            existing.match_score = scores["final_score"]
+        if existing and existing.analysis is not None:
+            gemini_score = existing.match_score
+            matched_skills = existing.matched_skills or []
+            missing_skills = existing.missing_skills or []
+            experience_match = existing.experience_match or "unknown"
+            education_match = existing.education_match or "unknown"
+            analysis = existing.analysis
         else:
-            db.add(MatchResult(
-                candidate_id=candidate.id,
-                job_id=job_id,
-                match_score=scores["final_score"]
-            ))
+            # Re-parse candidate from raw_text if structured fields are empty
+            needs_reparse = (
+                not candidate.skills and
+                not candidate.experience and
+                not candidate.education and
+                candidate.raw_text
+            )
+            if needs_reparse:
+                parsed = _gemini_parse(candidate.raw_text)
+                if parsed.get("full_name"):
+                    candidate.full_name = parsed["full_name"]
+                if parsed.get("skills"):
+                    candidate.skills = parsed["skills"]
+                if parsed.get("experience"):
+                    candidate.experience = parsed["experience"]
+                if parsed.get("education"):
+                    candidate.education = parsed["education"]
+                db.commit()
+                time.sleep(5)  # 1 req used — wait before next call
+
+            cv_data = {
+                "skills": candidate.skills or [],
+                "experience": candidate.experience,
+                "education": candidate.education,
+                "raw_text": candidate.raw_text,
+            }
+            gemini = match_cv_with_gemini(
+                cv_data=cv_data,
+                job_title=job.title,
+                job_description=job.description,
+                required_skills=job.required_skills or [],
+                required_experience_years=job.required_experience_years or 0,
+                required_education=job.required_education or "",
+            )
+            time.sleep(5)  # proactive spacing between Gemini calls
+            gemini_score = gemini["score"]
+            matched_skills = gemini["matched_skills"]
+            missing_skills = gemini["missing_skills"]
+            experience_match = gemini["experience_match"]
+            education_match = gemini["education_match"]
+            analysis = gemini["summary"]
+
+            if existing:
+                existing.match_score = gemini_score
+                existing.matched_skills = matched_skills
+                existing.missing_skills = missing_skills
+                existing.experience_match = experience_match
+                existing.education_match = education_match
+                existing.analysis = analysis
+            else:
+                db.add(MatchResult(
+                    candidate_id=candidate.id,
+                    job_id=job_id,
+                    match_score=gemini_score,
+                    matched_skills=matched_skills,
+                    missing_skills=missing_skills,
+                    experience_match=experience_match,
+                    education_match=education_match,
+                    analysis=analysis,
+                ))
+            db.commit()
 
         results.append({
             "candidate": {
@@ -94,16 +147,16 @@ def match_candidates(
                 "uploaded_at": candidate.uploaded_at.isoformat(),
                 "cv_filename": candidate.cv_filename,
             },
-            "match_score": scores["final_score"],
-            "semantic_score": scores["semantic_score"],
-            "experience_score": scores["experience_score"],
-            "education_score": scores["education_score"],
-            "candidate_years": scores["candidate_years"],
+            "match_score": gemini_score,
+            "matched_skills": matched_skills,
+            "missing_skills": missing_skills,
+            "experience_match": experience_match,
+            "education_match": education_match,
+            "analysis": analysis,
             "applied": is_applied,
             "application_status": applied_candidate_ids.get(candidate.id, None)
         })
 
-    db.commit()
     results.sort(key=lambda x: (not x["applied"], -x["match_score"]))
 
     return {
@@ -158,7 +211,7 @@ async def public_apply(
         if existing_app:
             raise HTTPException(status_code=400, detail="You have already applied to this position")
     else:
-        embedding = get_embedding(parsed["raw_text"])
+        embedding = get_embedding(build_embedding_text(parsed))
         ext = Path(file.filename).suffix
         stored_filename = f"{uuid.uuid4().hex}{ext}"
         (UPLOAD_DIR / stored_filename).write_bytes(file_bytes)
@@ -186,8 +239,8 @@ async def public_apply(
         scores = calculate_match_score(
             candidate_embedding=candidate.embedding,
             job_embedding=job.embedding,
-            candidate_experience_text=candidate.experience,
-            candidate_education_text=candidate.education,
+            candidate_experience_text=candidate.experience or candidate.raw_text,
+            candidate_education_text=candidate.education or candidate.raw_text,
             required_experience_years=job.required_experience_years or 0,
             required_education=job.required_education or "",
         )

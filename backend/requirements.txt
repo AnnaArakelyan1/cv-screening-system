@@ -15,3 +15,4 @@ scikit-learn
 numpy
 deep-translator
 sentence-transformers
+google-genai

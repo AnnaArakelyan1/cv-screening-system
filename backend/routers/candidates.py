@@ -7,7 +7,7 @@ from models.job import Job
 from models.user import User
 from schemas.candidate import CandidateOut
 from utils.auth import get_current_user
-from utils.cv_parser import parse_cv, is_likely_cv
+from utils.cv_parser import parse_cv, is_likely_cv, build_embedding_text
 from utils.matcher import get_embedding, cluster_candidates, calculate_match_score
 from utils.email_sender import send_email
 from typing import List
@@ -35,7 +35,7 @@ async def upload_cv(
     if not is_likely_cv(parsed):
         raise HTTPException(status_code=400, detail="The uploaded file does not appear to be a CV")
 
-    embedding = get_embedding(parsed["raw_text"])
+    embedding = get_embedding(build_embedding_text(parsed))
 
     if parsed.get("email"):
         existing = db.query(Candidate).filter(Candidate.email == parsed["email"]).first()
@@ -76,8 +76,8 @@ async def upload_cv(
                     scores = calculate_match_score(
                         candidate_embedding=candidate.embedding,
                         job_embedding=job.embedding,
-                        candidate_experience_text=candidate.experience,
-                        candidate_education_text=candidate.education,
+                        candidate_experience_text=candidate.experience or candidate.raw_text,
+                        candidate_education_text=candidate.education or candidate.raw_text,
                         required_experience_years=job.required_experience_years or 0,
                         required_education=job.required_education or "",
                     )

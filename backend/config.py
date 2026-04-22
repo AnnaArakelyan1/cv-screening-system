@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080
     MAIL_EMAIL: str = ""
     MAIL_PASSWORD: str = ""
+    GOOGLE_API_KEY: str = ""
 
     class Config:
         env_file = ".env"
