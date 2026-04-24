@@ -7,6 +7,7 @@
 
 .users-stat-card {
   background: var(--card);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   padding: 1.25rem 1.5rem;
@@ -41,6 +42,7 @@
 /* Add user panel */
 .add-user-panel {
   background: var(--card);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   padding: 1.75rem;
@@ -87,11 +89,12 @@
 }
 
 .create-btn:hover:not(:disabled) { background: var(--primary-dark); }
-.create-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+.create-btn:disabled { background: rgba(255,255,255,0.1); color: var(--muted); cursor: not-allowed; }
 
 /* Users list panel */
 .users-list-panel {
   background: var(--card);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   padding: 1.75rem;
@@ -110,7 +113,7 @@
 }
 
 .users-count {
-  background: var(--bg);
+  background: rgba(255,255,255,0.07);
   color: var(--muted);
   font-size: 0.8rem;
   padding: 0.15rem 0.55rem;
@@ -148,12 +151,12 @@
   padding: 0.85rem 0.75rem;
   font-size: 0.9rem;
   color: var(--text);
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
 
 .users-table tr:last-child td { border-bottom: none; }
-.users-table tr:hover td { background: #fafafa; }
+.users-table tr:hover td { background: rgba(255,255,255,0.03); }
 
 .user-cell {
   display: flex;
@@ -185,8 +188,41 @@
   font-weight: 600;
 }
 
-.role-admin { background: #eff6ff; color: var(--primary); }
-.role-hr    { background: #f0fdf4; color: #16a34a; }
+.role-admin { background: rgba(124,108,248,0.15); color: #a99cf8; }
+.role-hr    { background: rgba(52,211,153,0.12);  color: #34d399; }
+
+.user-inactive td { opacity: 0.45; }
+
+.active-badge {
+  padding: 0.2rem 0.65rem;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.active-badge.active   { background: rgba(52,211,153,0.12); color: #34d399; }
+.active-badge.inactive { background: rgba(255,255,255,0.07); color: var(--muted); }
+
+.user-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.toggle-btn {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1.5px solid;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+.toggle-btn:hover { opacity: 0.8; }
+.toggle-btn.deactivate { background: rgba(251,191,36,0.1); color: var(--warning); border-color: rgba(251,191,36,0.25); }
+.toggle-btn.activate   { background: rgba(52,211,153,0.1); color: #34d399; border-color: rgba(52,211,153,0.25); }
 
 .users-table .delete-btn {
   padding: 0.3rem 0.7rem;

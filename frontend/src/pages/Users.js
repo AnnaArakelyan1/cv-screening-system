@@ -45,6 +45,16 @@ const Users = () => {
     }
   };
 
+  const handleToggleActive = async (id, isActive, name) => {
+    try {
+      await API.patch(`/users/${id}/toggle-active`);
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, is_active: !isActive } : u));
+      showToast(`User "${name}" ${isActive ? 'deactivated' : 'activated'}.`);
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Failed to update user.', 'error');
+    }
+  };
+
   const hrUsers = users.filter(u => !u.is_admin);
   const adminUsers = users.filter(u => u.is_admin);
 
@@ -119,13 +129,14 @@ const Users = () => {
                     <th>Name</th>
                     <th>Email</th>
                     <th>Role</th>
+                    <th>Status</th>
                     <th>Joined</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.map(u => (
-                    <tr key={u.id}>
+                    <tr key={u.id} className={!u.is_active ? 'user-inactive' : ''}>
                       <td>
                         <div className="user-cell">
                           <div className="user-avatar-sm">
@@ -140,12 +151,25 @@ const Users = () => {
                           {u.is_admin ? 'Admin' : 'HR'}
                         </span>
                       </td>
+                      <td>
+                        <span className={`active-badge ${u.is_active ? 'active' : 'inactive'}`}>
+                          {u.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
                       <td className="muted">{new Date(u.created_at).toLocaleDateString()}</td>
                       <td>
                         {!u.is_admin && (
-                          <button className="delete-btn" onClick={() => handleDelete(u.id, u.full_name)}>
-                            Delete
-                          </button>
+                          <div className="user-actions">
+                            <button
+                              className={`toggle-btn ${u.is_active ? 'deactivate' : 'activate'}`}
+                              onClick={() => handleToggleActive(u.id, u.is_active, u.full_name)}
+                            >
+                              {u.is_active ? 'Deactivate' : 'Activate'}
+                            </button>
+                            <button className="delete-btn" onClick={() => handleDelete(u.id, u.full_name)}>
+                              Delete
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>

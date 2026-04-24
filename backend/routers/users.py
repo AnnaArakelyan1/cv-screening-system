@@ -66,6 +66,25 @@ def delete_own_account(
     db.commit()
     return {"message": "Your account has been deleted"}
 
+@router.patch("/{user_id}/toggle-active")
+def toggle_active(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot deactivate your own account")
+    if user.is_admin:
+        raise HTTPException(status_code=400, detail="Cannot deactivate an admin account")
+    user.is_active = not user.is_active
+    db.commit()
+    return {"is_active": user.is_active}
+
 @router.delete("/{user_id}")
 def delete_user(
     user_id: int,

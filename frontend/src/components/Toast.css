@@ -3,41 +3,46 @@
   bottom: 2rem;
   right: 2rem;
   padding: 1rem 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   display: flex;
   align-items: center;
   gap: 1rem;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
+  font-weight: 500;
   z-index: 9999;
-  animation: slideIn 0.3s ease;
+  animation: slideIn 0.25s ease;
   min-width: 280px;
   max-width: 400px;
+  border: 1px solid;
 }
 
 .toast-success {
-  background: #27ae60;
-  color: white;
+  background: rgba(52,211,153,0.12);
+  color: #34d399;
+  border-color: rgba(52,211,153,0.25);
 }
 
 .toast-error {
-  background: #e74c3c;
-  color: white;
+  background: rgba(248,113,113,0.12);
+  color: #f87171;
+  border-color: rgba(248,113,113,0.25);
 }
 
 .toast-warning {
-  background: #f39c12;
-  color: white;
+  background: rgba(251,191,36,0.12);
+  color: var(--warning);
+  border-color: rgba(251,191,36,0.25);
 }
 
 .toast-close {
   background: none;
   border: none;
-  color: white;
+  color: inherit;
   cursor: pointer;
   font-size: 1rem;
   margin-left: auto;
-  opacity: 0.8;
+  opacity: 0.7;
 }
 
 .toast-close:hover {

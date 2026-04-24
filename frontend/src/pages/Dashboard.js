@@ -144,26 +144,17 @@ const Dashboard = () => {
       <h1>Candidates</h1>
 
       <div className="stats-row">
-        <div className="stat-card">
-          <div className="stat-icon stat-icon--blue">👥</div>
-          <div>
-            <div className="stat-value">{stats.total}</div>
-            <div className="stat-label">Total Candidates</div>
-          </div>
+        <div className="stat-card stat-card--blue">
+          <div className="stat-value">{stats.total}</div>
+          <div className="stat-label">Total Candidates</div>
         </div>
-        <div className="stat-card">
-          <div className="stat-icon stat-icon--green">💼</div>
-          <div>
-            <div className="stat-value">{stats.openJobs}</div>
-            <div className="stat-label">Open Jobs</div>
-          </div>
+        <div className="stat-card stat-card--green">
+          <div className="stat-value">{stats.openJobs}</div>
+          <div className="stat-label">Open Jobs</div>
         </div>
-        <div className="stat-card">
-          <div className="stat-icon stat-icon--purple">✨</div>
-          <div>
-            <div className="stat-value">{stats.newThisWeek}</div>
-            <div className="stat-label">New This Week</div>
-          </div>
+        <div className="stat-card stat-card--purple">
+          <div className="stat-value">{stats.newThisWeek}</div>
+          <div className="stat-label">New This Week</div>
         </div>
       </div>
 

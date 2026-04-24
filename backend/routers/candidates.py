@@ -1,14 +1,15 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Form
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from database import get_db
 from models.candidate import Candidate
 from models.job import Job
+from models.application import Application
 from models.user import User
 from schemas.candidate import CandidateOut
 from utils.auth import get_current_user
 from utils.cv_parser import parse_cv, is_likely_cv, build_embedding_text
-from utils.matcher import get_embedding, cluster_candidates, calculate_match_score
+from utils.matcher import get_embedding, cluster_candidates
 from utils.email_sender import send_email
 from typing import List
 from pathlib import Path
@@ -23,9 +24,21 @@ router = APIRouter()
 @router.post("/upload", response_model=CandidateOut)
 async def upload_cv(
     file: UploadFile = File(...),
+    job_id: int = Form(...),
+    full_name: str = Form(None),
+    email: str = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    from datetime import datetime, timezone
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if not job.is_open:
+        raise HTTPException(status_code=400, detail="This job is closed")
+    if job.deadline and datetime.now(timezone.utc) > job.deadline:
+        raise HTTPException(status_code=400, detail="The application deadline for this job has passed")
+
     if not file.filename.endswith((".pdf", ".docx")):
         raise HTTPException(status_code=400, detail="Only PDF and DOCX files are supported")
 
@@ -40,18 +53,22 @@ async def upload_cv(
     if parsed.get("email"):
         existing = db.query(Candidate).filter(Candidate.email == parsed["email"]).first()
         if existing:
-            raise HTTPException(
-                status_code=409,
-                detail=f"A candidate with email {parsed['email']} already exists (ID: {existing.id}, Name: {existing.full_name})"
-            )
+            existing_app = db.query(Application).filter(
+                Application.candidate_id == existing.id,
+                Application.job_id == job_id
+            ).first()
+            if not existing_app:
+                db.add(Application(candidate_id=existing.id, job_id=job_id))
+                db.commit()
+            return existing
 
     ext = Path(file.filename).suffix
     stored_filename = f"{uuid.uuid4().hex}{ext}"
     (UPLOAD_DIR / stored_filename).write_bytes(file_bytes)
 
     candidate = Candidate(
-        full_name=parsed["full_name"],
-        email=parsed["email"],
+        full_name=full_name or parsed["full_name"],
+        email=email or parsed["email"],
         phone=parsed["phone"],
         skills=parsed["skills"],
         education=parsed.get("education"),
@@ -65,55 +82,21 @@ async def upload_cv(
     db.commit()
     db.refresh(candidate)
 
+    db.add(Application(candidate_id=candidate.id, job_id=job_id))
+    db.commit()
 
-    if candidate.email and candidate.embedding:
+    if candidate.email:
         try:
-            jobs = db.query(Job).filter(Job.embedding != None).all()
+            send_email(
+                to_email=candidate.email,
+                subject=f"Application Received – {job.title}",
+                body=f"""Dear {candidate.full_name or 'Candidate'},
 
-            if jobs:
-                job_lines = []
-                for job in jobs:
-                    scores = calculate_match_score(
-                        candidate_embedding=candidate.embedding,
-                        job_embedding=job.embedding,
-                        candidate_experience_text=candidate.experience or candidate.raw_text,
-                        candidate_education_text=candidate.education or candidate.raw_text,
-                        required_experience_years=job.required_experience_years or 0,
-                        required_education=job.required_education or "",
-                    )
-                    score = scores["final_score"]
-                    if score >= 70:
-                        verdict = "Strong Match"
-                    elif score >= 40:
-                        verdict = "Moderate Match"
-                    else:
-                        verdict = "Low Match"
-
-                    job_lines.append(
-                        f"  {job.title:<35} {score}%  ({verdict})"
-                    )
-
-                job_summary = "\n".join(job_lines)
-
-                send_email(
-                    to_email=candidate.email,
-                    subject="Your CV Has Been Received",
-                    body=f"""Dear {candidate.full_name or 'Candidate'},
-
-Thank you for submitting your CV. We have successfully received and analyzed your profile.
-
-YOUR MATCH RESULTS
----------------------------
-{job_summary}
----------------------------
-
-Skills detected: {', '.join(candidate.skills or [])}
-
-Our HR team will review your profile and contact you if there is a suitable opportunity.
+Thank you for your interest in the {job.title} position. We have successfully received your CV and our HR team will review your profile shortly.
 
 Best regards,
 HR Team"""
-                )
+            )
         except Exception as e:
             logging.warning(f"Failed to send upload email to {candidate.email}: {e}")
 

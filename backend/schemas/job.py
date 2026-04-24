@@ -8,10 +8,15 @@ class JobCreate(BaseModel):
     required_skills: List[str] = []
     required_experience_years: int = 0
     required_education: Optional[str] = None
+    deadline: Optional[datetime] = None
+
+class JobUpdate(BaseModel):
+    deadline: Optional[datetime] = None
 
 class JobOut(JobCreate):
     id: int
     is_open: bool = True
+    deadline: Optional[datetime] = None
     created_at: datetime
 
     class Config:

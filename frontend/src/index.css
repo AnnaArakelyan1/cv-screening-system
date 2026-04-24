@@ -1,21 +1,21 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 :root {
-  --primary:      #2563eb;
-  --primary-dark: #1d4ed8;
-  --navy:         #1e293b;
-  --success:      #10b981;
-  --danger:       #ef4444;
-  --warning:      #f59e0b;
-  --bg:           #f1f5f9;
-  --card:         #ffffff;
-  --border:       #e2e8f0;
-  --text:         #1e293b;
-  --muted:        #64748b;
-  --radius:       12px;
-  --shadow-sm:    0 1px 3px rgba(0,0,0,0.08);
-  --shadow:       0 4px 12px rgba(0,0,0,0.08);
-  --shadow-lg:    0 8px 24px rgba(0,0,0,0.1);
+  --primary:      #7c6cf8;
+  --primary-dark: #6c5ce7;
+  --navy:         #eeeef8;
+  --success:      #34d399;
+  --danger:       #f87171;
+  --warning:      #fbbf24;
+  --bg:           #0d0d1f;
+  --card:         #16162a;
+  --border:       #2a2a42;
+  --text:         #c8ceee;
+  --muted:        #7880a0;
+  --radius:       8px;
+  --shadow-sm:    0 1px 4px rgba(0,0,0,0.5);
+  --shadow:       0 4px 16px rgba(0,0,0,0.5);
+  --shadow-lg:    0 8px 32px rgba(0,0,0,0.6);
 }
 
 body {
@@ -31,12 +31,10 @@ p { margin: 0 0 0.5rem; }
 a { text-decoration: none; }
 input, textarea, button, select { font-family: inherit; }
 
-/* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: #3a3a58; border-radius: 3px; }
 
-/* Shared page wrapper */
 .page {
   padding: 2rem 2.5rem;
   max-width: 1200px;
@@ -50,7 +48,6 @@ input, textarea, button, select { font-family: inherit; }
   margin-bottom: 1.75rem;
 }
 
-/* Shared card */
 .card {
   background: var(--card);
   border-radius: var(--radius);
@@ -58,7 +55,6 @@ input, textarea, button, select { font-family: inherit; }
   padding: 1.5rem;
 }
 
-/* Shared buttons */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -73,40 +69,38 @@ input, textarea, button, select { font-family: inherit; }
 }
 .btn:hover { opacity: 0.88; }
 .btn:active { transform: scale(0.98); }
-.btn-primary  { background: var(--primary); color: #fff; }
-.btn-danger   { background: var(--danger);  color: #fff; }
-.btn-ghost    { background: #f1f5f9; color: var(--text); }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-danger  { background: var(--danger);  color: #fff; }
+.btn-ghost   { background: rgba(255,255,255,0.06); color: var(--text); }
 
-/* Global delete button (used across pages) */
 .delete-btn {
-  background: var(--danger);
-  color: #fff;
-  border: none;
+  background: rgba(248,113,113,0.12);
+  color: var(--danger);
+  border: 1px solid rgba(248,113,113,0.25);
   padding: 0.4rem 1rem;
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.85rem;
-  transition: opacity 0.15s;
+  transition: background 0.15s;
 }
-.delete-btn:hover { opacity: 0.85; }
+.delete-btn:hover { background: rgba(248,113,113,0.22); }
 
-/* Skills */
 .skills { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
 .skill-tag {
-  background: #eff6ff;
-  color: var(--primary);
+  background: rgba(124,108,248,0.14);
+  color: #a99cf8;
   padding: 0.2rem 0.65rem;
   border-radius: 20px;
   font-size: 0.78rem;
   font-weight: 500;
 }
-.skill-tag.highlighted { background: var(--warning); color: #fff; }
+.skill-tag.highlighted { background: rgba(251,191,36,0.2); color: var(--warning); }
 
-/* Shared form inputs */
 input[type="text"],
 input[type="email"],
 input[type="password"],
 input[type="number"],
+input[type="datetime-local"],
 textarea,
 select {
   width: 100%;
@@ -115,11 +109,12 @@ select {
   border-radius: 8px;
   font-size: 0.95rem;
   color: var(--text);
-  background: #fff;
+  background: #0e0e1c;
   transition: border-color 0.2s, box-shadow 0.2s;
   outline: none;
 }
 input:focus, textarea:focus, select:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+  box-shadow: 0 0 0 3px rgba(124,108,248,0.15);
 }
+select option { background: #16162a; }

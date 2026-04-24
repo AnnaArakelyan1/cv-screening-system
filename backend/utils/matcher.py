@@ -162,21 +162,15 @@ def calculate_match_score(
         "candidate_years": candidate_years,
     }
 
-def cluster_candidates(candidates, n_clusters=3):
+def cluster_candidates(embeddings, n_clusters=3):
     from sklearn.cluster import KMeans
-    import numpy as np
 
-    if len(candidates) < n_clusters:
-        n_clusters = len(candidates)
+    if len(embeddings) < n_clusters:
+        n_clusters = len(embeddings)
 
-    embeddings = np.array([c.embedding for c in candidates])
+    matrix = np.array(embeddings)
     kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-    labels = kmeans.fit_predict(embeddings)
-
-    for i, candidate in enumerate(candidates):
-        candidate.cluster_id = int(labels[i])
-
-    return candidates
+    return kmeans.fit_predict(matrix).tolist()
 
 
 def match_cv_with_gemini(
@@ -238,7 +232,11 @@ CANDIDATE PROFILE:
     last_err = None
     for attempt in range(5):
         try:
-            response = _gemini_client.models.generate_content(model="gemini-2.5-flash-lite", contents=prompt)
+            response = _gemini_client.models.generate_content(
+                model="gemini-2.5-flash-lite",
+                contents=prompt,
+                config={"temperature": 0},
+            )
             text = response.text.strip()
             text = re.sub(r'^```(?:json)?\s*', '', text)
             text = re.sub(r'\s*```$', '', text)

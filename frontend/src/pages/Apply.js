@@ -9,7 +9,9 @@ const Apply = () => {
   const { jobId } = useParams();
   const [job, setJob] = useState(null);
   const [file, setFile] = useState(null);
-  const [status, setStatus] = useState('idle'); // idle | loading | success | error
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
@@ -26,6 +28,8 @@ const Apply = () => {
 
     const formData = new FormData();
     formData.append('file', file);
+    if (fullName.trim()) formData.append('full_name', fullName.trim());
+    if (email.trim()) formData.append('email', email.trim());
 
     try {
       await axios.post(`${API_BASE}/jobs/${jobId}/apply`, formData, {
@@ -90,7 +94,7 @@ const Apply = () => {
           </div>
         )}
 
-        {(job.required_experience_years > 0 || job.required_education) && (
+        {(job.required_experience_years > 0 || job.required_education || job.deadline) && (
           <div className="apply-meta">
             {job.required_experience_years > 0 && (
               <span>Experience: {job.required_experience_years}+ years</span>
@@ -98,11 +102,31 @@ const Apply = () => {
             {job.required_education && (
               <span>Education: {job.required_education}</span>
             )}
+            {job.deadline && (
+              <span className={job.deadline_passed ? 'apply-deadline-passed' : 'apply-deadline'}>
+                Deadline: {new Date(job.deadline).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                {job.deadline_passed ? ' (Passed)' : ''}
+              </span>
+            )}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="apply-form">
-          <h3>Upload Your CV</h3>
+          <h3>Your Details</h3>
+          <input
+            type="text"
+            className="apply-input"
+            placeholder="Full Name"
+            value={fullName}
+            onChange={e => setFullName(e.target.value)}
+          />
+          <input
+            type="email"
+            className="apply-input"
+            placeholder="Email Address"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+          />
           <div className="apply-upload-area">
             <input
               type="file"

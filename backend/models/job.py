@@ -14,5 +14,6 @@ class Job(Base):
     required_education = Column(String, nullable=True)
     embedding = Column(ARRAY(Float), nullable=True)
     is_open = Column(Boolean, default=True, server_default='true', nullable=False)
+    deadline = Column(DateTime(timezone=True), nullable=True)
     created_by = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime(timezone=True), server_default=func.now())

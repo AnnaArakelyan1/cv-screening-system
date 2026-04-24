@@ -64,6 +64,7 @@
 /* Create form */
 .job-form-box {
   background: var(--card);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   padding: 1.75rem;
@@ -105,11 +106,12 @@
 }
 
 .job-form-box button[type="submit"]:hover:not(:disabled) { background: var(--primary-dark); }
-.job-form-box button[type="submit"]:disabled { background: #94a3b8; cursor: not-allowed; }
+.job-form-box button[type="submit"]:disabled { background: rgba(255,255,255,0.12); cursor: not-allowed; color: var(--muted); }
 
 /* Table */
 .table-wrap {
   background: var(--card);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   overflow-x: auto;
@@ -122,7 +124,7 @@
 }
 
 .jobs-table thead tr {
-  border-bottom: 2px solid var(--border);
+  border-bottom: 1.5px solid var(--border);
 }
 
 .jobs-table th {
@@ -142,7 +144,7 @@
 }
 
 .jobs-table tbody tr:last-child { border-bottom: none; }
-.jobs-table tbody tr:hover { background: #f8fafc; }
+.jobs-table tbody tr:hover { background: rgba(255,255,255,0.03); }
 
 .jobs-table td {
   padding: 0.85rem 1rem;
@@ -167,8 +169,9 @@
   letter-spacing: 0.04em;
 }
 
-.job-status.open   { background: #f0fdf4; color: #16a34a; }
-.job-status.closed { background: #fef2f2; color: var(--danger); }
+.job-status.open    { background: rgba(52,211,153,0.15);  color: #34d399; }
+.job-status.closed  { background: rgba(248,113,113,0.12); color: #f87171; }
+.job-status.expired { background: rgba(251,191,36,0.12);  color: var(--warning); }
 
 .skills-cell {
   display: flex;
@@ -178,9 +181,9 @@
 
 .copy-btn {
   padding: 0.3rem 0.7rem;
-  background: var(--navy);
-  color: #fff;
-  border: none;
+  background: rgba(255,255,255,0.07);
+  color: var(--text);
+  border: 1px solid var(--border);
   border-radius: 5px;
   cursor: pointer;
   font-size: 0.78rem;
@@ -189,7 +192,7 @@
   white-space: nowrap;
 }
 
-.copy-btn:hover { background: #334155; }
+.copy-btn:hover { background: rgba(255,255,255,0.12); }
 
 .row-actions {
   display: flex;
@@ -210,10 +213,36 @@
 
 .act-btn:hover { opacity: 0.82; }
 
-.act-match  { background: #eff6ff; color: var(--primary);  border: 1.5px solid #bfdbfe; }
-.act-open   { background: #f0fdf4; color: #15803d;         border: 1.5px solid #bbf7d0; }
-.act-close  { background: #fff7ed; color: #c2410c;         border: 1.5px solid #fed7aa; }
-.act-delete { background: #fef2f2; color: var(--danger);   border: 1.5px solid #fecaca; }
+.act-match  { background: rgba(124,108,248,0.14); color: #a99cf8; border: 1.5px solid rgba(124,108,248,0.25); }
+.act-open   { background: rgba(52,211,153,0.12);  color: #34d399; border: 1.5px solid rgba(52,211,153,0.22); }
+.act-close  { background: rgba(251,191,36,0.12);  color: var(--warning); border: 1.5px solid rgba(251,191,36,0.22); }
+.act-delete { background: rgba(248,113,113,0.12); color: #f87171; border: 1.5px solid rgba(248,113,113,0.22); }
+
+.td-deadline { min-width: 120px; }
+
+.deadline-display {
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.deadline-active { color: #34d399; font-weight: 500; }
+.deadline-passed { color: var(--danger); font-weight: 500; }
+.deadline-none   { color: var(--muted); font-size: 0.8rem; text-decoration: underline dotted; }
+
+.deadline-edit { display: flex; flex-direction: column; gap: 4px; }
+
+.deadline-input {
+  padding: 0.3rem 0.5rem;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  background: var(--bg);
+  color: var(--text);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.deadline-edit-actions { display: flex; gap: 4px; }
 
 .empty-msg {
   color: var(--muted);

@@ -219,7 +219,11 @@ def _gemini_parse(raw_text: str) -> dict:
     last_err = None
     for attempt in range(5):
         try:
-            response = _gemini_client.models.generate_content(model="gemini-2.5-flash-lite", contents=prompt)
+            response = _gemini_client.models.generate_content(
+                model="gemini-2.5-flash-lite",
+                contents=prompt,
+                config={"temperature": 0},
+            )
             text = response.text.strip()
             text = re.sub(r'^```(?:json)?\s*', '', text)
             text = re.sub(r'\s*```$', '', text)

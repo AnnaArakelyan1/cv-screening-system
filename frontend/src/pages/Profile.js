@@ -29,7 +29,7 @@ const Profile = () => {
         const s = { candidates: candidatesRes.data.length, jobs: jobsRes.data.length, users: 0 };
         if (meRes.data.is_admin) {
           const usersRes = await API.get('/users/');
-          s.users = usersRes.data.length;
+          s.users = usersRes.data.filter(u => !u.is_admin).length;
         }
         setStats(s);
       } catch {}

@@ -12,28 +12,32 @@
 .stat-cards-row .stat-card {
   flex: 1;
   min-width: 140px;
-  background: #1e1e2e;
-  border: 1px solid #2a2a3a;
-  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 20px 24px;
   text-align: center;
+  box-shadow: var(--shadow-sm);
 }
 
 .stat-card .stat-value {
   font-size: 2rem;
   font-weight: 700;
-  color: #6c63ff;
+  color: var(--navy);
 }
 
 .stat-card .stat-label {
-  font-size: 0.85rem;
-  color: #a0a0b0;
+  font-size: 0.82rem;
+  color: var(--muted);
   margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
 }
 
 .stat-card .stat-sub {
   font-size: 0.78rem;
-  color: #27ae60;
+  color: var(--success);
   margin-top: 4px;
 }
 
@@ -44,10 +48,11 @@
 }
 
 .chart-card {
-  background: #1e1e2e;
-  border: 1px solid #2a2a3a;
-  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 20px 16px;
+  box-shadow: var(--shadow-sm);
 }
 
 .chart-card.wide {
@@ -56,19 +61,22 @@
 
 .chart-card h3 {
   margin: 0 0 16px 0;
-  font-size: 1rem;
-  color: #e0e0f0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .chart-card .empty {
-  color: #a0a0b0;
+  color: var(--muted);
   font-size: 0.9rem;
   text-align: center;
   padding: 40px 0;
 }
 
 .loading-text {
-  color: #a0a0b0;
+  color: var(--muted);
   text-align: center;
   padding: 60px 0;
 }

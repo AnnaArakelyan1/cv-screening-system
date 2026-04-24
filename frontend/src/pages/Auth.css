@@ -3,15 +3,16 @@
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #1e293b 0%, #1e3a5f 100%);
+  background: var(--bg);
   padding: 1rem;
 }
 
 .auth-box {
-  background: #fff;
+  background: var(--card);
+  border: 1px solid var(--border);
   padding: 2.5rem;
   border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  box-shadow: var(--shadow-lg);
   width: 100%;
   max-width: 400px;
 }
@@ -55,22 +56,24 @@
 .error {
   color: var(--danger);
   font-size: 0.85rem;
-  background: #fef2f2;
+  background: rgba(248,113,113,0.1);
+  border: 1px solid rgba(248,113,113,0.2);
   border-radius: 6px;
   padding: 0.6rem 0.9rem;
   margin-bottom: 0.5rem;
 }
 
 .success {
-  color: #15803d;
+  color: var(--success);
   font-size: 0.85rem;
-  background: #f0fdf4;
+  background: rgba(52,211,153,0.1);
+  border: 1px solid rgba(52,211,153,0.2);
   border-radius: 6px;
   padding: 0.6rem 0.9rem;
   margin-bottom: 0.5rem;
 }
 
-/* Users table (used in Register/Users page) */
+/* Users table */
 .users-table-wrap { margin-top: 2rem; }
 
 .users-table-wrap h2 {
@@ -90,26 +93,27 @@
 }
 
 .users-table th {
-  background: var(--navy);
-  color: #fff;
+  background: rgba(255,255,255,0.04);
+  color: var(--muted);
   padding: 0.75rem 1rem;
   text-align: left;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  border-bottom: 1.5px solid var(--border);
 }
 
 .users-table td {
   padding: 0.8rem 1rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--border);
   font-size: 0.88rem;
   color: var(--text);
   vertical-align: middle;
 }
 
 .users-table tr:last-child td { border-bottom: none; }
-.users-table tr:hover td { background: #fafafa; }
+.users-table tr:hover td { background: rgba(255,255,255,0.03); }
 
 .users-table .delete-btn {
   padding: 0.3rem 0.75rem;

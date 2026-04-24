@@ -1,5 +1,6 @@
 .upload-box {
   background: var(--card);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   padding: 2rem;
@@ -30,15 +31,30 @@
 
 .upload-file-label:hover {
   border-color: var(--primary);
-  background: #eff6ff;
-  color: var(--primary);
+  background: rgba(124,108,248,0.07);
+  color: #a99cf8;
 }
 
 .upload-file-label.has-file {
   border-color: var(--success);
-  background: #f0fdf4;
-  color: #15803d;
+  background: rgba(52,211,153,0.07);
+  color: #34d399;
 }
+
+.job-select {
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: var(--text);
+  background: #0e0e1c;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  outline: none;
+}
+
+.job-select:focus { border-color: var(--primary); }
 
 .upload-box button[type="submit"] {
   padding: 0.75rem;
@@ -53,13 +69,13 @@
 }
 
 .upload-box button[type="submit"]:hover:not(:disabled) { opacity: 0.88; }
-.upload-box button[type="submit"]:disabled { background: #94a3b8; cursor: not-allowed; }
+.upload-box button[type="submit"]:disabled { background: rgba(255,255,255,0.1); color: var(--muted); cursor: not-allowed; }
 
 .error-msg {
   color: var(--danger);
   font-size: 0.88rem;
   padding: 0.75rem 1rem;
-  background: #fef2f2;
+  background: rgba(248,113,113,0.1);
   border-radius: 8px;
   border-left: 3px solid var(--danger);
 }
@@ -67,13 +83,13 @@
 .result {
   margin-top: 1.25rem;
   padding: 1.25rem 1.5rem;
-  background: #f0fdf4;
+  background: rgba(52,211,153,0.08);
   border-radius: 10px;
   border-left: 4px solid var(--success);
 }
 
 .result h3 {
-  color: #15803d;
+  color: #34d399;
   font-size: 1rem;
   margin-bottom: 0.75rem;
 }

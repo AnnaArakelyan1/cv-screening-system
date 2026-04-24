@@ -12,8 +12,9 @@ const Jobs = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [form, setForm]       = useState({
     title: '', description: '', required_skills: '',
-    required_experience_years: 0, required_education: ''
+    required_experience_years: 0, required_education: '', deadline: ''
   });
+  const [deadlineEdit, setDeadlineEdit] = useState(null);
   const [loading, setLoading] = useState(false);
   const [toast, setToast]     = useState(null);
   const [copiedId, setCopiedId] = useState(null);
@@ -62,8 +63,9 @@ const Jobs = () => {
         ...form,
         required_skills: form.required_skills.split(',').map(s => s.trim()).filter(Boolean),
         required_experience_years: parseInt(form.required_experience_years) || 0,
+        deadline: form.deadline ? new Date(form.deadline).toISOString() : null,
       });
-      setForm({ title: '', description: '', required_skills: '', required_experience_years: 0, required_education: '' });
+      setForm({ title: '', description: '', required_skills: '', required_experience_years: 0, required_education: '', deadline: '' });
       setShowForm(false);
       await fetchJobs();
       showToast('Job created successfully!');
@@ -80,6 +82,18 @@ const Jobs = () => {
       setJobs(next);
     } catch {
       showToast('Failed to update job status.', 'error');
+    }
+  };
+
+  const handleDeadlineSave = async (job) => {
+    try {
+      await API.patch(`/jobs/${job.id}`, {
+        deadline: deadlineEdit.value ? new Date(deadlineEdit.value).toISOString() : null
+      });
+      await fetchJobs();
+      setDeadlineEdit(null);
+    } catch {
+      showToast('Failed to update deadline.', 'error');
     }
   };
 
@@ -151,6 +165,11 @@ const Jobs = () => {
               onChange={e => setForm({ ...form, required_experience_years: e.target.value })} />
             <input type="text" placeholder="Required Education" value={form.required_education}
               onChange={e => setForm({ ...form, required_education: e.target.value })} />
+            <label style={{ fontSize: '0.82rem', color: 'var(--muted)', marginBottom: '-0.5rem' }}>
+              Application Deadline (optional)
+            </label>
+            <input type="datetime-local" value={form.deadline}
+              onChange={e => setForm({ ...form, deadline: e.target.value })} />
             <button type="submit" disabled={loading}>{loading ? 'Creating…' : 'Create Job'}</button>
           </form>
         </div>
@@ -167,6 +186,7 @@ const Jobs = () => {
                 <th>Required Skills</th>
                 <th>Exp.</th>
                 <th>Education</th>
+                <th>Deadline</th>
                 <th>Status</th>
                 <th>Apply Link</th>
                 <th>Actions</th>
@@ -199,10 +219,40 @@ const Jobs = () => {
                     {job.required_experience_years ? `${job.required_experience_years}y` : '—'}
                   </td>
                   <td className="td-muted">{job.required_education || '—'}</td>
+                  <td className="td-deadline">
+                    {deadlineEdit?.id === job.id ? (
+                      <div className="deadline-edit">
+                        <input
+                          type="datetime-local"
+                          value={deadlineEdit.value}
+                          onChange={e => setDeadlineEdit({ ...deadlineEdit, value: e.target.value })}
+                          className="deadline-input"
+                        />
+                        <div className="deadline-edit-actions">
+                          <button className="act-btn act-open" onClick={() => handleDeadlineSave(job)}>Save</button>
+                          <button className="act-btn" style={{background:'#f1f5f9',color:'var(--muted)',border:'1.5px solid var(--border)'}} onClick={() => setDeadlineEdit(null)}>Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="deadline-display" onClick={() => setDeadlineEdit({ id: job.id, value: job.deadline ? new Date(job.deadline).toISOString().slice(0,16) : '' })}>
+                        {job.deadline
+                          ? <span className={new Date(job.deadline) < new Date() ? 'deadline-passed' : 'deadline-active'}>
+                              {new Date(job.deadline).toLocaleDateString()}
+                            </span>
+                          : <span className="deadline-none">Set deadline</span>
+                        }
+                      </div>
+                    )}
+                  </td>
                   <td>
-                    <span className={`job-status ${job.is_open ? 'open' : 'closed'}`}>
-                      {job.is_open ? 'Open' : 'Closed'}
-                    </span>
+                    {(() => {
+                      const expired = !job.is_open && job.deadline && new Date(job.deadline) < new Date();
+                      return (
+                        <span className={`job-status ${job.is_open ? 'open' : expired ? 'expired' : 'closed'}`}>
+                          {job.is_open ? 'Open' : expired ? 'Expired' : 'Closed'}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td>
                     <button className="copy-btn" onClick={() => copyLink(job.id)}>

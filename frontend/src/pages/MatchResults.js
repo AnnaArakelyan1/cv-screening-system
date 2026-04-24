@@ -20,9 +20,7 @@ const downloadCV = async (candidateId, filename) => {
 const MatchResults = () => {
   const { id } = useParams();
   const [results, setResults] = useState([]);
-  const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [assigning, setAssigning] = useState(false);
   const [emailModal, setEmailModal] = useState(null);
   const [emailForm, setEmailForm] = useState({ subject: '', body: '' });
   const [sending, setSending] = useState(false);
@@ -33,9 +31,6 @@ const MatchResults = () => {
       try {
         const matchRes = await API.get(`/jobs/${id}/match`);
         setResults(matchRes.data.results);
-        if (matchRes.data.emails_sent > 0) {
-          alert(`✅ ${matchRes.data.emails_sent} candidate(s) automatically notified by email.`);
-        }
       } catch (err) {
         console.error(err);
       }
@@ -43,43 +38,6 @@ const MatchResults = () => {
     };
     fetchData();
   }, [id]);
-
-  const toggleSelect = (candidateId) => {
-    setSelected(prev =>
-      prev.includes(candidateId)
-        ? prev.filter(i => i !== candidateId)
-        : [...prev, candidateId]
-    );
-  };
-
-  const selectAll = () => {
-    const nonApplied = results
-      .filter(r => !r.applied)
-      .map(r => r.candidate.id);
-    setSelected(nonApplied);
-  };
-
-  const clearAll = () => setSelected([]);
-
-  const handleAssignSelected = async () => {
-    if (selected.length === 0) return;
-    setAssigning(true);
-    let success = 0;
-    for (const candidateId of selected) {
-      try {
-        await API.post('/applications/', {
-          candidate_id: candidateId,
-          job_id: parseInt(id)
-        });
-        success++;
-      } catch (err) {}
-    }
-    const res = await API.get(`/jobs/${id}/match`);
-    setResults(res.data.results);
-    setSelected([]);
-    setAssigning(false);
-    alert(`Successfully assigned ${success} candidate(s).`);
-  };
 
   const handleStatusChange = async (candidateId, status) => {
     try {
@@ -95,7 +53,7 @@ const MatchResults = () => {
   };
 
   const handleUnassign = async (candidateId) => {
-    if (!window.confirm('Unassign this candidate from the job?')) return;
+    if (!window.confirm('Remove this candidate from the job?')) return;
     try {
       const appsRes = await API.get(`/applications/job/${id}`);
       const application = appsRes.data.find(a => a.candidate_id === candidateId);
@@ -127,222 +85,125 @@ const MatchResults = () => {
       });
       alert(`Email sent to ${emailModal.email}`);
       setEmailModal(null);
-    } catch (err) {
+    } catch {
       alert('Failed to send email. Check your email credentials in backend/.env');
     }
     setSending(false);
   };
 
   const getScoreColor = (score) => {
-    if (score >= 70) return '#27ae60';
-    if (score >= 40) return '#f39c12';
-    return '#e74c3c';
+    if (score >= 70) return '#34d399';
+    if (score >= 40) return '#fbbf24';
+    return '#f87171';
   };
 
-  const getRankStyle = (index) => {
-    if (index === 0) return { color: '#f1c40f', fontSize: '2rem' };
-    if (index === 1) return { color: '#95a5a6', fontSize: '1.8rem' };
-    if (index === 2) return { color: '#cd7f32', fontSize: '1.6rem' };
-    return { color: '#bdc3c7', fontSize: '1.4rem' };
+  const getRankEmoji = (index) => {
+    if (index === 0) return { label: '#1', color: '#fbbf24' };
+    if (index === 1) return { label: '#2', color: '#a99cf8' };
+    if (index === 2) return { label: '#3', color: '#f87171' };
+    return { label: `#${index + 1}`, color: '#7880a0' };
   };
 
   const matchLabel = (val) => {
-    if (val === 'exceeds') return { text: '↑ exceeds', color: '#27ae60' };
-    if (val === 'meets')   return { text: '✓ meets',   color: '#27ae60' };
-    if (val === 'below')   return { text: '↓ below',   color: '#e74c3c' };
-    return { text: '—', color: '#95a5a6' };
+    if (val === 'exceeds') return { text: '↑', color: '#34d399' };
+    if (val === 'meets')   return { text: '✓', color: '#34d399' };
+    if (val === 'below')   return { text: '↓', color: '#f87171' };
+    return { text: '—', color: '#7880a0' };
   };
-
-  const ScoreBox = ({ r, showUnassign }) => (
-    <div className="score-box">
-      <div className="score-circle" style={{ borderColor: getScoreColor(r.match_score) }}>
-        <span className="score-number" style={{ color: getScoreColor(r.match_score) }}>
-          {r.match_score}%
-        </span>
-        <span className="score-label">match</span>
-      </div>
-      <div className="score-breakdown">
-        <div className="breakdown-row">
-          <span>Experience</span>
-          <span style={{ color: matchLabel(r.experience_match).color }}>
-            {matchLabel(r.experience_match).text}
-          </span>
-        </div>
-        <div className="breakdown-row">
-          <span>Education</span>
-          <span style={{ color: matchLabel(r.education_match).color }}>
-            {matchLabel(r.education_match).text}
-          </span>
-        </div>
-      </div>
-      {r.analysis && <p className="gemini-summary">{r.analysis}</p>}
-      {(r.matched_skills || []).length > 0 && (
-        <div className="skill-match-row">
-          {r.matched_skills.slice(0, 4).map(s => (
-            <span key={s} className="skill-match-tag matched">{s}</span>
-          ))}
-        </div>
-      )}
-      {(r.missing_skills || []).length > 0 && (
-        <div className="skill-match-row">
-          {r.missing_skills.slice(0, 3).map(s => (
-            <span key={s} className="skill-match-tag missing">{s}</span>
-          ))}
-        </div>
-      )}
-      {r.candidate.cv_filename && (
-        <button
-          className="email-btn"
-          onClick={(e) => { e.stopPropagation(); downloadCV(r.candidate.id, r.candidate.cv_filename); }}
-        >
-          ↓ CV
-        </button>
-      )}
-      <button
-        className="email-btn"
-        onClick={(e) => { e.stopPropagation(); openEmailModal(r.candidate); }}
-      >
-        ✉ Email
-      </button>
-      {showUnassign && (
-        <div className="status-actions">
-          <button
-            className={`status-action-btn accept-btn ${r.application_status === 'accepted' ? 'active' : ''}`}
-            onClick={() => handleStatusChange(r.candidate.id, 'accepted')}
-            disabled={r.application_status === 'accepted'}
-          >
-            ✓ Accept
-          </button>
-          <button
-            className={`status-action-btn reject-btn ${r.application_status === 'rejected' ? 'active' : ''}`}
-            onClick={() => handleStatusChange(r.candidate.id, 'rejected')}
-            disabled={r.application_status === 'rejected'}
-          >
-            ✕ Reject
-          </button>
-        </div>
-      )}
-      {showUnassign && (
-        <button className="unassign-btn" onClick={() => handleUnassign(r.candidate.id)}>
-          Unassign
-        </button>
-      )}
-    </div>
-  );
-
-  const appliedResults = results.filter(r => r.applied);
-  const otherResults = results.filter(r => !r.applied);
 
   return (
     <div className="page">
       <button className="back-btn" onClick={() => navigate('/jobs')}>← Back to Jobs</button>
       <h1>Candidate Match Results</h1>
 
-      <div className="assign-box">
-        <div className="assign-box-header">
-          <h3>Assign Candidates to this Job</h3>
-          <p>Select candidates from the list below and assign them to this job posting.</p>
-        </div>
-        <div className="assign-actions">
-          <button className="select-btn" onClick={selectAll}>Select All</button>
-          <button className="clear-btn" onClick={clearAll}>Clear</button>
-          <button
-            className="assign-btn"
-            onClick={handleAssignSelected}
-            disabled={selected.length === 0 || assigning}
-          >
-            {assigning ? 'Assigning...' : `✓ Assign (${selected.length})`}
-          </button>
-        </div>
-      </div>
-
       {loading ? (
-        <div className="loading-box">
-          <p>Calculating match scores...</p>
-        </div>
+        <div className="loading-box"><p>Calculating match scores...</p></div>
+      ) : results.length === 0 ? (
+        <p className="empty-msg">No candidates have applied for this job yet.</p>
       ) : (
-        <>
-          {appliedResults.length > 0 && (
-            <div className="section">
-              <div className="section-header applied-header">
-                <span>✅ Applied Candidates</span>
-                <span className="count-badge">{appliedResults.length}</span>
-              </div>
-              <div className="results-list">
-                {appliedResults.map((r, index) => (
-                  <div className="result-card applied-card" key={r.candidate.id}>
-                    <div className="rank-box">
-                      <span style={getRankStyle(index)}>#{index + 1}</span>
-                    </div>
-                    <div className="candidate-info">
-                      <div className="name-row">
-                        <h3>{r.candidate.full_name || 'Unknown'}</h3>
-                        <span className={`status-badge ${r.application_status}`}>
-                          {r.application_status}
-                        </span>
-                      </div>
-                      <p className="candidate-email">{r.candidate.email || 'No email'}</p>
-                      <div className="skills">
-                        {(r.candidate.skills || []).slice(0, 6).map(s => (
-                          <span key={s} className="skill-tag">{s}</span>
-                        ))}
-                        {(r.candidate.skills || []).length > 6 && (
-                          <span className="skill-tag more">+{r.candidate.skills.length - 6}</span>
-                        )}
-                      </div>
-                    </div>
-                    <ScoreBox r={r} showUnassign={true} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+        <div className="section">
+          <div className="section-header applied-header">
+            <span>Applicants</span>
+            <span className="count-badge">{results.length}</span>
+          </div>
+          <div className="results-list">
+            {results.map((r, index) => {
+              const rank = getRankEmoji(index);
+              const expL = matchLabel(r.experience_match);
+              const eduL = matchLabel(r.education_match);
+              return (
+                <div className="result-card" key={r.candidate.id}>
+                  <div className="rc-rank" style={{ color: rank.color }}>{rank.label}</div>
 
-          {otherResults.length > 0 && (
-            <div className="section">
-              <div className="section-header other-header">
-                <span>👥 Other Candidates</span>
-                <span className="count-badge">{otherResults.length}</span>
-              </div>
-              <div className="results-list">
-                {otherResults.map((r, index) => (
-                  <div
-                    className={`result-card other-card ${selected.includes(r.candidate.id) ? 'selected-card' : ''}`}
-                    key={r.candidate.id}
-                    onClick={() => toggleSelect(r.candidate.id)}
-                  >
-                    <input
-                      type="checkbox"
-                      className="candidate-checkbox"
-                      checked={selected.includes(r.candidate.id)}
-                      onChange={() => toggleSelect(r.candidate.id)}
-                      onClick={e => e.stopPropagation()}
-                    />
-                    <div className="rank-box">
-                      <span style={getRankStyle(index)}>#{index + 1}</span>
+                  <div className="rc-info">
+                    <div className="rc-name-row">
+                      <span className="rc-name">{r.candidate.full_name || 'Unknown'}</span>
+                      <span className={`status-badge ${r.application_status}`}>{r.application_status}</span>
                     </div>
-                    <div className="candidate-info">
-                      <h3>{r.candidate.full_name || 'Unknown'}</h3>
-                      <p className="candidate-email">{r.candidate.email || 'No email'}</p>
-                      <div className="skills">
-                        {(r.candidate.skills || []).slice(0, 6).map(s => (
-                          <span key={s} className="skill-tag">{s}</span>
-                        ))}
-                        {(r.candidate.skills || []).length > 6 && (
-                          <span className="skill-tag more">+{r.candidate.skills.length - 6}</span>
-                        )}
-                      </div>
+                    <div className="rc-email">{r.candidate.email || '—'}</div>
+                    <div className="rc-skills">
+                      {(r.candidate.skills || []).slice(0, 5).map(s => (
+                        <span key={s} className="skill-tag">{s}</span>
+                      ))}
+                      {(r.candidate.skills || []).length > 5 && (
+                        <span className="skill-tag more">+{r.candidate.skills.length - 5}</span>
+                      )}
                     </div>
-                    <ScoreBox r={r} showUnassign={false} />
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
+
+                  <div className="rc-score-col">
+                    <div className="score-circle" style={{ borderColor: getScoreColor(r.match_score) }}>
+                      <span className="score-number" style={{ color: getScoreColor(r.match_score) }}>{r.match_score}%</span>
+                      <span className="score-label">match</span>
+                    </div>
+                    <div className="rc-breakdown">
+                      <span>Exp <span style={{ color: expL.color }}>{expL.text}</span></span>
+                      <span>Edu <span style={{ color: eduL.color }}>{eduL.text}</span></span>
+                    </div>
+                  </div>
+
+                  <div className="rc-detail-col">
+                    {r.analysis && <p className="rc-analysis">{r.analysis}</p>}
+                    {(r.matched_skills || []).length > 0 && (
+                      <div className="rc-chip-row">
+                        {r.matched_skills.slice(0, 3).map(s => (
+                          <span key={s} className="skill-match-tag matched">{s}</span>
+                        ))}
+                      </div>
+                    )}
+                    {(r.missing_skills || []).length > 0 && (
+                      <div className="rc-chip-row">
+                        {r.missing_skills.slice(0, 2).map(s => (
+                          <span key={s} className="skill-match-tag missing">{s}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rc-actions">
+                    {r.candidate.cv_filename && (
+                      <button className="act-sm act-cv" onClick={() => downloadCV(r.candidate.id, r.candidate.cv_filename)}>↓ CV</button>
+                    )}
+                    <button className="act-sm act-email" onClick={() => openEmailModal(r.candidate)}>✉</button>
+                    <button
+                      className={`act-sm act-accept ${r.application_status === 'accepted' ? 'active' : ''}`}
+                      onClick={() => handleStatusChange(r.candidate.id, 'accepted')}
+                      disabled={r.application_status === 'accepted'}
+                    >✓</button>
+                    <button
+                      className={`act-sm act-reject ${r.application_status === 'rejected' ? 'active' : ''}`}
+                      onClick={() => handleStatusChange(r.candidate.id, 'rejected')}
+                      disabled={r.application_status === 'rejected'}
+                    >✕</button>
+                    <button className="act-sm act-remove" onClick={() => handleUnassign(r.candidate.id)}>Remove</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
 
-      {/* Email Modal */}
       {emailModal && (
         <div className="modal-overlay" onClick={() => setEmailModal(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -364,9 +225,7 @@ const MatchResults = () => {
               <button className="assign-btn" onClick={handleSendEmail} disabled={sending}>
                 {sending ? 'Sending...' : 'Send Email'}
               </button>
-              <button className="clear-btn" onClick={() => setEmailModal(null)}>
-                Cancel
-              </button>
+              <button className="clear-btn" onClick={() => setEmailModal(null)}>Cancel</button>
             </div>
           </div>
         </div>
