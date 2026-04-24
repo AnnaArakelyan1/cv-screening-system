@@ -9,6 +9,7 @@ import MatchResults from './pages/MatchResults';
 import Profile from './pages/Profile';
 import Users from './pages/Users';
 import Apply from './pages/Apply';
+import Statistics from './pages/Statistics';
 import Navbar from './components/Navbar';
 
 const PrivateRoute = ({ children }) => {
@@ -31,6 +32,7 @@ function AppRoutes() {
         <Route path="/jobs/:id/match" element={<PrivateRoute><MatchResults /></PrivateRoute>} />
         <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
         <Route path="/users" element={<PrivateRoute><Users /></PrivateRoute>} />
+        <Route path="/statistics" element={<PrivateRoute><Statistics /></PrivateRoute>} />
         <Route path="/apply/:jobId" element={<Apply />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

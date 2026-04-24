@@ -9,8 +9,9 @@ const Profile = () => {
   const [me, setMe] = useState(null);
   const [stats, setStats] = useState({ candidates: 0, jobs: 0, users: 0 });
   const [toast, setToast] = useState(null);
-  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
-  const [pwLoading, setPwLoading] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ full_name: '', email: '', current_password: '', new_password: '', confirm_password: '' });
+  const [saving, setSaving] = useState(false);
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -21,13 +22,11 @@ const Profile = () => {
       try {
         const meRes = await API.get('/users/me');
         setMe(meRes.data);
-
         const [candidatesRes, jobsRes] = await Promise.all([
           API.get('/candidates/'),
           API.get('/jobs/'),
         ]);
         const s = { candidates: candidatesRes.data.length, jobs: jobsRes.data.length, users: 0 };
-
         if (meRes.data.is_admin) {
           const usersRes = await API.get('/users/');
           s.users = usersRes.data.length;
@@ -38,28 +37,35 @@ const Profile = () => {
     load();
   }, []);
 
-  const handleChangePassword = async (e) => {
+  const openEdit = () => {
+    setEditForm({ full_name: me.full_name, email: me.email, current_password: '', new_password: '', confirm_password: '' });
+    setEditOpen(true);
+  };
+
+  const handleSave = async (e) => {
     e.preventDefault();
-    if (pwForm.next !== pwForm.confirm) {
+    if (editForm.new_password && editForm.new_password !== editForm.confirm_password) {
       showToast('New passwords do not match.', 'error');
       return;
     }
-    if (pwForm.next.length < 6) {
-      showToast('New password must be at least 6 characters.', 'error');
-      return;
-    }
-    setPwLoading(true);
+    setSaving(true);
     try {
-      await API.post('/auth/change-password', {
-        current_password: pwForm.current,
-        new_password: pwForm.next,
-      });
-      showToast('Password updated successfully.');
-      setPwForm({ current: '', next: '', confirm: '' });
+      const payload = {
+        full_name: editForm.full_name.trim() || undefined,
+        email: editForm.email.trim() || undefined,
+      };
+      if (editForm.new_password) {
+        payload.current_password = editForm.current_password;
+        payload.new_password = editForm.new_password;
+      }
+      const res = await API.patch('/users/me', payload);
+      setMe(res.data);
+      setEditOpen(false);
+      showToast('Profile updated successfully.');
     } catch (err) {
-      showToast(err.response?.data?.detail || 'Failed to update password.', 'error');
+      showToast(err.response?.data?.detail || 'Failed to update profile.', 'error');
     }
-    setPwLoading(false);
+    setSaving(false);
   };
 
   const handleDeleteSelf = async () => {
@@ -73,9 +79,7 @@ const Profile = () => {
     }
   };
 
-  if (!me) return (
-    <div className="page"><p className="loading-msg">Loading profile...</p></div>
-  );
+  if (!me) return <div className="page"><p className="loading-msg">Loading profile...</p></div>;
 
   const initials = me.full_name
     ? me.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
@@ -96,11 +100,9 @@ const Profile = () => {
           <p className="profile-since">
             Member since {new Date(me.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
           </p>
-
+          <button className="edit-profile-btn" onClick={openEdit}>Edit Profile</button>
           {!me.is_admin && (
-            <button className="delete-account-btn" onClick={handleDeleteSelf}>
-              Delete Account
-            </button>
+            <button className="delete-account-btn" onClick={handleDeleteSelf}>Delete Account</button>
           )}
         </div>
 
@@ -142,9 +144,7 @@ const Profile = () => {
             </div>
             <div className="detail-row">
               <span className="detail-label">Account Status</span>
-              <span className="detail-value">
-                <span className="status-active">Active</span>
-              </span>
+              <span className="detail-value"><span className="status-active">Active</span></span>
             </div>
             <div className="detail-row">
               <span className="detail-label">Member Since</span>
@@ -153,47 +153,79 @@ const Profile = () => {
               </span>
             </div>
           </div>
+        </div>
+      </div>
 
-          <div className="profile-details-card">
-            <h3>Change Password</h3>
-            <form onSubmit={handleChangePassword} className="pw-form">
-              <div className="pw-field">
-                <label>Current Password</label>
-                <input
-                  type="password"
-                  placeholder="Enter current password"
-                  value={pwForm.current}
-                  onChange={e => setPwForm({ ...pwForm, current: e.target.value })}
-                  required
-                />
+      {editOpen && (
+        <div className="modal-overlay" onClick={() => setEditOpen(false)}>
+          <div className="modal edit-profile-modal" onClick={e => e.stopPropagation()}>
+            <h3>Edit Profile</h3>
+            <form onSubmit={handleSave} className="edit-form">
+              <div className="edit-section">
+                <div className="pw-field">
+                  <label>Full Name</label>
+                  <input
+                    type="text"
+                    value={editForm.full_name}
+                    onChange={e => setEditForm({ ...editForm, full_name: e.target.value })}
+                  />
+                </div>
+                <div className="pw-field">
+                  <label>Email</label>
+                  <input
+                    type="email"
+                    value={editForm.email}
+                    onChange={e => setEditForm({ ...editForm, email: e.target.value })}
+                  />
+                </div>
               </div>
-              <div className="pw-field">
-                <label>New Password</label>
-                <input
-                  type="password"
-                  placeholder="At least 6 characters"
-                  value={pwForm.next}
-                  onChange={e => setPwForm({ ...pwForm, next: e.target.value })}
-                  required
-                />
+
+              <div className="edit-divider">
+                <span>Change Password <span className="optional">(optional)</span></span>
               </div>
-              <div className="pw-field">
-                <label>Confirm New Password</label>
-                <input
-                  type="password"
-                  placeholder="Repeat new password"
-                  value={pwForm.confirm}
-                  onChange={e => setPwForm({ ...pwForm, confirm: e.target.value })}
-                  required
-                />
+
+              <div className="edit-section">
+                <div className="pw-field">
+                  <label>Current Password</label>
+                  <input
+                    type="password"
+                    placeholder="Required only if changing password"
+                    value={editForm.current_password}
+                    onChange={e => setEditForm({ ...editForm, current_password: e.target.value })}
+                  />
+                </div>
+                <div className="pw-field">
+                  <label>New Password</label>
+                  <input
+                    type="password"
+                    placeholder="At least 6 characters"
+                    value={editForm.new_password}
+                    onChange={e => setEditForm({ ...editForm, new_password: e.target.value })}
+                  />
+                </div>
+                <div className="pw-field">
+                  <label>Confirm New Password</label>
+                  <input
+                    type="password"
+                    placeholder="Repeat new password"
+                    value={editForm.confirm_password}
+                    onChange={e => setEditForm({ ...editForm, confirm_password: e.target.value })}
+                  />
+                </div>
               </div>
-              <button type="submit" className="pw-submit-btn" disabled={pwLoading}>
-                {pwLoading ? 'Updating...' : 'Update Password'}
-              </button>
+
+              <div className="modal-actions">
+                <button type="submit" className="pw-submit-btn" disabled={saving}>
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </button>
+                <button type="button" className="cancel-btn" onClick={() => setEditOpen(false)}>
+                  Cancel
+                </button>
+              </div>
             </form>
           </div>
         </div>
-      </div>
+      )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>

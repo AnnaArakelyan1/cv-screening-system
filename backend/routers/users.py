@@ -1,12 +1,46 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from pydantic import BaseModel, EmailStr
+from typing import List, Optional
 from database import get_db
 from models.user import User
 from schemas.user import UserOut
-from utils.auth import get_current_user
-from typing import List
+from utils.auth import get_current_user, hash_password, verify_password
 
 router = APIRouter()
+
+class ProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    current_password: Optional[str] = None
+    new_password: Optional[str] = None
+
+@router.patch("/me", response_model=UserOut)
+def update_me(
+    data: ProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if data.full_name:
+        current_user.full_name = data.full_name.strip()
+
+    if data.email and data.email != current_user.email:
+        if db.query(User).filter(User.email == data.email, User.id != current_user.id).first():
+            raise HTTPException(status_code=400, detail="Email already in use")
+        current_user.email = data.email
+
+    if data.new_password:
+        if not data.current_password:
+            raise HTTPException(status_code=400, detail="Current password required to set a new one")
+        if not verify_password(data.current_password, current_user.hashed_password):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+        if len(data.new_password) < 6:
+            raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+        current_user.hashed_password = hash_password(data.new_password)
+
+    db.commit()
+    db.refresh(current_user)
+    return current_user
 
 @router.get("/me", response_model=UserOut)
 def get_me(current_user: User = Depends(get_current_user)):

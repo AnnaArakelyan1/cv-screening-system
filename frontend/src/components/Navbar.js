@@ -19,6 +19,7 @@ const Navbar = () => {
         <NavLink to="/" end>Dashboard</NavLink>
         <NavLink to="/upload">Upload CV</NavLink>
         <NavLink to="/jobs">Jobs</NavLink>
+        <NavLink to="/statistics">Statistics</NavLink>
         <NavLink to="/profile">Profile</NavLink>
         {user?.is_admin && (
           <NavLink to="/users" className="admin-link">Users</NavLink>

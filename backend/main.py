@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base, SessionLocal
-from routers import auth, candidates, jobs, applications, email, users
+from routers import auth, candidates, jobs, applications, email, users, stats
 from models.user import User
 from utils.auth import hash_password
 
@@ -43,6 +43,7 @@ app.include_router(jobs.router, prefix="/jobs", tags=["Jobs"])
 app.include_router(applications.router, prefix="/applications", tags=["Applications"])
 app.include_router(email.router, prefix="/email", tags=["Email"])
 app.include_router(users.router, prefix="/users", tags=["Users"])
+app.include_router(stats.router, prefix="/stats", tags=["Stats"])
 
 @app.get("/")
 def root():

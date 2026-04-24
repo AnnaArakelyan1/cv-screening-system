@@ -43,6 +43,13 @@ def apply_to_job(
     db.refresh(application)
     return application
 
+@router.get("/", response_model=List[ApplicationOut])
+def get_all_applications(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return db.query(Application).all()
+
 @router.get("/job/{job_id}", response_model=List[ApplicationOut])
 def get_applications_for_job(
     job_id: int,

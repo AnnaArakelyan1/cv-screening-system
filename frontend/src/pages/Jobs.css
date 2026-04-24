@@ -1,10 +1,74 @@
+.jobs-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.jobs-search-row {
+  display: flex;
+  gap: 0.6rem;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.jobs-search-input {
+  flex: 1;
+  min-width: 220px;
+  padding: 0.6rem 0.9rem;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: var(--card);
+  transition: border-color 0.15s;
+}
+
+.jobs-search-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.jobs-status-select {
+  padding: 0.6rem 0.75rem;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  color: var(--text);
+  background: var(--card);
+  cursor: pointer;
+}
+
+.jobs-status-select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.new-job-btn {
+  padding: 0.6rem 1.25rem;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.new-job-btn:hover { background: var(--primary-dark); }
+
+/* Create form */
 .job-form-box {
   background: var(--card);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   padding: 1.75rem;
   max-width: 600px;
-  margin-bottom: 2rem;
+  margin-bottom: 1.75rem;
 }
 
 .job-form-box h2 {
@@ -23,7 +87,7 @@
 }
 
 .job-form-box textarea {
-  min-height: 100px;
+  min-height: 90px;
   resize: vertical;
 }
 
@@ -43,67 +107,77 @@
 .job-form-box button[type="submit"]:hover:not(:disabled) { background: var(--primary-dark); }
 .job-form-box button[type="submit"]:disabled { background: #94a3b8; cursor: not-allowed; }
 
-.job-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.25rem;
-}
-
-.job-card {
+/* Table */
+.table-wrap {
   background: var(--card);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  transition: box-shadow 0.2s, transform 0.2s;
-  border-top: 3px solid transparent;
+  overflow-x: auto;
 }
 
-.job-card:hover {
-  box-shadow: var(--shadow);
-  transform: translateY(-2px);
-  border-top-color: var(--primary);
+.jobs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
 }
 
-.job-card h3 {
-  font-size: 1rem;
+.jobs-table thead tr {
+  border-bottom: 2px solid var(--border);
+}
+
+.jobs-table th {
+  padding: 0.85rem 1rem;
+  text-align: left;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.jobs-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.12s;
+}
+
+.jobs-table tbody tr:last-child { border-bottom: none; }
+.jobs-table tbody tr:hover { background: #f8fafc; }
+
+.jobs-table td {
+  padding: 0.85rem 1rem;
+  vertical-align: middle;
+}
+
+.td-name {
   font-weight: 600;
   color: var(--navy);
 }
 
-.job-card > p {
-  color: var(--muted);
-  font-size: 0.85rem;
-  line-height: 1.5;
-  flex: 1;
+.td-muted { color: var(--muted); }
+.td-center { text-align: center; }
+
+.job-status {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.65rem;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-.apply-link-row {
+.job-status.open   { background: #f0fdf4; color: #16a34a; }
+.job-status.closed { background: #fef2f2; color: var(--danger); }
+
+.skills-cell {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: #f8fafc;
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border);
-  margin-top: 0.5rem;
-}
-
-.apply-link {
-  flex: 1;
-  font-size: 0.75rem;
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: monospace;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .copy-btn {
-  flex-shrink: 0;
-  padding: 0.3rem 0.75rem;
+  padding: 0.3rem 0.7rem;
   background: var(--navy);
   color: #fff;
   border: none;
@@ -112,64 +186,36 @@
   font-size: 0.78rem;
   font-weight: 500;
   transition: background 0.15s;
-  width: auto;
-  margin-top: 0;
+  white-space: nowrap;
 }
 
 .copy-btn:hover { background: #334155; }
 
-.job-card button:not(.copy-btn):not(.delete-btn) {
-  margin-top: 0.5rem;
-  padding: 0.55rem 1rem;
-  background: var(--primary);
-  color: #fff;
-  border: none;
-  border-radius: 7px;
-  cursor: pointer;
-  font-size: 0.88rem;
-  font-weight: 500;
-  width: 100%;
-  transition: background 0.15s;
-}
-
-.job-card button:not(.copy-btn):not(.delete-btn):hover { background: var(--primary-dark); }
-
-.job-card .delete-btn { margin-top: 0.25rem; width: 100%; }
-
-.job-card-header {
+.row-actions {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.4rem;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
-.job-card-header h3 { margin: 0; }
-
-.job-status {
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 0.2rem 0.6rem;
-  border-radius: 20px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  flex-shrink: 0;
-}
-
-.job-status.open  { background: #f0fdf4; color: #16a34a; }
-.job-status.closed { background: #fef2f2; color: var(--danger); }
-
-.toggle-btn {
-  width: 100%;
-  padding: 0.55rem;
-  border: none;
-  border-radius: 7px;
-  cursor: pointer;
-  font-size: 0.88rem;
+.act-btn {
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
   font-weight: 500;
-  margin-top: 0.25rem;
+  cursor: pointer;
+  border: none;
+  white-space: nowrap;
   transition: opacity 0.15s;
 }
-.toggle-btn:hover { opacity: 0.85; }
-.btn-close { background: #fff7ed; color: #c2410c; border: 1.5px solid #fed7aa; }
-.btn-open  { background: #f0fdf4; color: #15803d; border: 1.5px solid #bbf7d0; }
+
+.act-btn:hover { opacity: 0.82; }
+
+.act-match  { background: #eff6ff; color: var(--primary);  border: 1.5px solid #bfdbfe; }
+.act-open   { background: #f0fdf4; color: #15803d;         border: 1.5px solid #bbf7d0; }
+.act-close  { background: #fff7ed; color: #c2410c;         border: 1.5px solid #fed7aa; }
+.act-delete { background: #fef2f2; color: var(--danger);   border: 1.5px solid #fecaca; }
+
+.empty-msg {
+  color: var(--muted);
+  padding: 2rem 0;
+}
