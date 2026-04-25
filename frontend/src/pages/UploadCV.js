@@ -90,7 +90,7 @@ const UploadCV = () => {
             {file ? `✓  ${file.name}` : '📄  Choose a PDF or DOCX file'}
           </label>
           <button type="submit" disabled={loading || !file || !jobId}>
-            {loading ? 'Processing...' : 'Upload & Analyze'}
+            {loading ? 'Parsing CV with AI…' : 'Upload & Analyze'}
           </button>
         </form>
 

@@ -33,8 +33,6 @@ def update_me(
         current_user.email = data.email
 
     if data.new_password:
-        if not current_user.is_admin:
-            raise HTTPException(status_code=403, detail="Password changes must be done by an administrator")
         if not data.current_password:
             raise HTTPException(status_code=400, detail="Current password is required")
         if not verify_password(data.current_password, current_user.hashed_password):
@@ -79,15 +77,8 @@ def get_all_users(
     return db.query(User).all()
 
 @router.delete("/me")
-def delete_own_account(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    if current_user.is_admin:
-        raise HTTPException(status_code=400, detail="Admin account cannot be deleted")
-    db.delete(current_user)
-    db.commit()
-    return {"message": "Your account has been deleted"}
+def delete_own_account(current_user: User = Depends(get_current_user)):
+    raise HTTPException(status_code=403, detail="Account deletion must be done by an administrator")
 
 @router.patch("/{user_id}/toggle-active")
 def toggle_active(

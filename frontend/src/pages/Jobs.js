@@ -21,15 +21,20 @@ const Jobs = () => {
   const [copiedId, setCopiedId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [expandedSkills, setExpandedSkills] = useState(new Set());
+  const [reportModal, setReportModal] = useState(null);
   const navigate = useNavigate();
 
   const { user } = useAuth();
   const showToast = (msg, type = 'success') => setToast({ message: msg, type });
 
   const fetchJobs = async () => {
-    const res = await API.get('/jobs/');
-    setJobs(res.data);
-    setFiltered(res.data);
+    try {
+      const res = await API.get('/jobs/');
+      setJobs(res.data);
+      setFiltered(res.data);
+    } catch (err) {
+      if (err.code !== 'ERR_CANCELED') showToast('Failed to load jobs.', 'error');
+    }
   };
 
   useEffect(() => { fetchJobs(); }, []);
@@ -96,6 +101,29 @@ const Jobs = () => {
       setDeadlineEdit(null);
     } catch {
       showToast('Failed to update deadline.', 'error');
+    }
+  };
+
+  const fetchReport = async (job) => {
+    try {
+      const res = await API.get(`/jobs/${job.id}/report`);
+      setReportModal({ job, ...res.data });
+    } catch {
+      showToast('No report available for this job.', 'error');
+    }
+  };
+
+  const downloadReportPDF = async (job) => {
+    try {
+      const res = await API.get(`/jobs/${job.id}/report/pdf`, { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `report_${job.title.replace(/\s+/g, '_')}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      showToast('Failed to download report.', 'error');
     }
   };
 
@@ -272,6 +300,11 @@ const Jobs = () => {
                       >
                         {job.is_open ? 'Close' : 'Reopen'}
                       </button>
+                      {!job.is_open && (
+                        <button className="act-btn act-report" onClick={() => fetchReport(job)}>
+                          Report
+                        </button>
+                      )}
                       {user?.is_admin && (
                         <button className="act-btn act-delete" onClick={() => handleDelete(job.id)}>
                           Delete
@@ -285,6 +318,137 @@ const Jobs = () => {
           </table>
         </div>
       )}
+
+      {reportModal && (() => {
+        const rd = reportModal.data;
+        const sd = rd.score_distribution || {};
+        const EXP_LABELS = { exceeds: 'Exceeds', meets: 'Meets', below: 'Below', unknown: '—' };
+        const STATUS_LABELS = { applied: 'Pending', reviewed: 'Pending', shortlisted: 'Interview', accepted: 'Hired', rejected: 'Rejected' };
+        const renderCandidate = (c, i) => (
+          <div key={i} className="report-candidate">
+            <div style={{ flex: 1 }}>
+              <div className="report-cand-name">{c.name}</div>
+              <div className="report-cand-email">{[c.email, c.phone].filter(Boolean).join(' · ') || '—'}</div>
+              <div className="report-cand-meta">
+                Exp: {EXP_LABELS[c.experience_match] || '—'} · Edu: {EXP_LABELS[c.education_match] || '—'}
+              </div>
+              {c.matched_skills?.length > 0 && (
+                <div className="skills-cell" style={{ marginTop: '0.3rem' }}>
+                  {c.matched_skills.map(s => <span key={s} className="skill-tag">{s}</span>)}
+                </div>
+              )}
+              {c.missing_skills?.length > 0 && (
+                <div className="report-missing">Missing: {c.missing_skills.join(', ')}</div>
+              )}
+              {c.analysis && <div className="report-analysis">{c.analysis}</div>}
+            </div>
+            {c.score != null && <div className="report-cand-score">{c.score}%</div>}
+          </div>
+        );
+        return (
+          <div className="modal-overlay" onClick={() => setReportModal(null)}>
+            <div className="modal report-modal" onClick={e => e.stopPropagation()}>
+              <h3>{rd.job_title}</h3>
+              <p className="report-generated">
+                Report generated {new Date(reportModal.generated_at).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </p>
+
+              <div className="report-stats">
+                {[
+                  { num: rd.total_applicants, label: 'Total' },
+                  { num: rd.by_status.accepted, label: 'Hired' },
+                  { num: rd.by_status.shortlisted, label: 'Shortlisted' },
+                  { num: rd.by_status.rejected, label: 'Rejected' },
+                  { num: rd.by_status.pending, label: 'Pending' },
+                  { num: rd.avg_score != null ? `${rd.avg_score}%` : '—', label: 'Avg Score' },
+                ].map(({ num, label }) => (
+                  <div key={label} className="report-stat">
+                    <div className="report-stat-num">{num}</div>
+                    <div className="report-stat-label">{label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {(sd.strong || sd.good || sd.moderate || sd.weak) ? (
+                <div className="report-section">
+                  <h4>Score Distribution</h4>
+                  <div className="report-dist">
+                    {[['Strong 80+', sd.strong, '#34d399'], ['Good 60+', sd.good, '#60a5fa'], ['Moderate 40+', sd.moderate, '#fbbf24'], ['Weak', sd.weak, '#f87171']].map(([lbl, val, col]) => (
+                      <div key={lbl} className="report-dist-item">
+                        <span className="report-dist-num" style={{ color: col }}>{val || 0}</span>
+                        <span className="report-dist-label">{lbl}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {rd.top_missing_skills?.length > 0 && (
+                <div className="report-section">
+                  <h4>Most Missing Skills</h4>
+                  <div className="skills-cell">
+                    {rd.top_missing_skills.map(s => <span key={s} className="skill-tag">{s}</span>)}
+                  </div>
+                </div>
+              )}
+
+              {rd.hired?.length > 0 && (
+                <div className="report-section">
+                  <h4>Hired ({rd.hired.length})</h4>
+                  {rd.hired.map(renderCandidate)}
+                </div>
+              )}
+
+              {rd.shortlisted?.length > 0 && (
+                <div className="report-section">
+                  <h4>Shortlisted — Not Hired ({rd.shortlisted.length})</h4>
+                  {rd.shortlisted.map(renderCandidate)}
+                </div>
+              )}
+
+              {rd.all_candidates?.length > 0 && (
+                <div className="report-section">
+                  <h4>All Candidates ({rd.all_candidates.length})</h4>
+                  <table className="report-table">
+                    <thead>
+                      <tr><th>#</th><th>Name</th><th>Score</th><th>Status</th><th>Exp</th><th>Edu</th></tr>
+                    </thead>
+                    <tbody>
+                      {rd.all_candidates.map((c, i) => (
+                        <tr key={i}>
+                          <td className="report-td-muted">{i + 1}</td>
+                          <td>
+                            <div>{c.name}</div>
+                            <div className="report-td-sub">{c.email || ''}</div>
+                          </td>
+                          <td className="report-td-score">{c.score != null ? `${c.score}%` : '—'}</td>
+                          <td><span className={`report-status-badge ${c.status}`}>{STATUS_LABELS[c.status] || c.status}</span></td>
+                          <td className="report-td-muted">{EXP_LABELS[c.experience_match] || '—'}</td>
+                          <td className="report-td-muted">{EXP_LABELS[c.education_match] || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {rd.required_skills?.length > 0 && (
+                <div className="report-section">
+                  <h4>Required Skills</h4>
+                  <div className="skills-cell">
+                    {rd.required_skills.map(s => <span key={s} className="skill-tag">{s}</span>)}
+                  </div>
+                </div>
+              )}
+
+              <div className="modal-actions" style={{ marginTop: '1.5rem' }}>
+                <button className="act-btn act-match" onClick={() => downloadReportPDF(reportModal.job)}>Download PDF</button>
+                <button className="cancel-btn" onClick={() => setReportModal(null)}>Close</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>

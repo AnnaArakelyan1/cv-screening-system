@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base, SessionLocal
 from routers import auth, candidates, jobs, applications, email, users, stats
 from models.user import User
+from models.job_report import JobReport
 from utils.auth import hash_password
 
 Base.metadata.create_all(bind=engine)

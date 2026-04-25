@@ -1,4 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
+from fastapi.responses import StreamingResponse
+from database import SessionLocal
+import io
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.units import mm
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from sqlalchemy.orm import Session
 from database import get_db
 from models.job import Job
@@ -6,11 +15,12 @@ from models.candidate import Candidate
 from models.user import User
 from models.match_result import MatchResult
 from models.application import Application
+from models.job_report import JobReport
 from schemas.job import JobCreate, JobUpdate, JobOut
 from datetime import datetime, timezone
 from utils.auth import get_current_user
 from utils.matcher import get_embedding, match_cv_with_gemini
-from utils.cv_parser import parse_cv, is_likely_cv, build_embedding_text, _gemini_parse
+from utils.cv_parser import parse_cv_fast, is_likely_cv, build_embedding_text, _gemini_parse
 from utils.email_sender import send_email
 from typing import List
 from pathlib import Path
@@ -22,6 +32,16 @@ UPLOAD_DIR = Path("/app/uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 router = APIRouter()
+
+def _save_embedding(candidate_id: int, text: str):
+    db = SessionLocal()
+    try:
+        candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
+        if candidate:
+            candidate.embedding = get_embedding(text)
+            db.commit()
+    finally:
+        db.close()
 
 @router.post("/", response_model=JobOut)
 def create_job(
@@ -86,11 +106,9 @@ def match_candidates(
             education_match = existing.education_match or "unknown"
             analysis = existing.analysis
         else:
-            # Re-parse candidate from raw_text if structured fields are empty
+            # Re-parse with Gemini if experience or education is missing
             needs_reparse = (
-                not candidate.skills and
-                not candidate.experience and
-                not candidate.education and
+                (not candidate.experience or not candidate.education) and
                 candidate.raw_text
             )
             if needs_reparse:
@@ -197,6 +215,7 @@ def get_job_public(job_id: int, db: Session = Depends(get_db)):
 @router.post("/{job_id}/apply")
 async def public_apply(
     job_id: int,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     full_name: str = Form(None),
     email: str = Form(None),
@@ -214,7 +233,7 @@ async def public_apply(
         raise HTTPException(status_code=400, detail="Only PDF and DOCX files are supported")
 
     file_bytes = await file.read()
-    parsed = parse_cv(file_bytes, file.filename)
+    parsed = parse_cv_fast(file_bytes, file.filename)
 
     if not is_likely_cv(parsed):
         raise HTTPException(status_code=400, detail="The uploaded file does not appear to be a CV")
@@ -237,7 +256,6 @@ async def public_apply(
             candidate.full_name = full_name
         db.commit()
     else:
-        embedding = get_embedding(build_embedding_text(parsed))
         ext = Path(file.filename).suffix
         stored_filename = f"{uuid.uuid4().hex}{ext}"
         (UPLOAD_DIR / stored_filename).write_bytes(file_bytes)
@@ -250,23 +268,24 @@ async def public_apply(
             experience=parsed.get("experience"),
             raw_text=parsed["raw_text"],
             cv_filename=stored_filename,
-            embedding=embedding,
+            embedding=None,
             uploaded_by=None
         )
         db.add(candidate)
         db.commit()
         db.refresh(candidate)
+        background_tasks.add_task(_save_embedding, candidate.id, build_embedding_text(parsed))
 
     application = Application(candidate_id=candidate.id, job_id=job_id)
     db.add(application)
     db.commit()
 
     if candidate.email:
-        try:
-            send_email(
-                to_email=candidate.email,
-                subject=f"Application Received – {job.title}",
-                body=f"""Dear {candidate.full_name or 'Candidate'},
+        background_tasks.add_task(
+            send_email,
+            candidate.email,
+            f"Application Received – {job.title}",
+            f"""Dear {candidate.full_name or 'Candidate'},
 
 Thank you for applying for the position of {job.title}.
 
@@ -274,11 +293,94 @@ We have successfully received your CV and our HR team will review your profile s
 
 Best regards,
 HR Team"""
-            )
-        except Exception as e:
-            logging.warning(f"Failed to send confirmation email: {e}")
+        )
 
     return {"message": "Your CV has been received. We will be in touch soon!"}
+
+def _generate_report(job, db):
+    applications = db.query(Application).filter(Application.job_id == job.id).all()
+    total = len(applications)
+    by_status = {"pending": 0, "shortlisted": 0, "accepted": 0, "rejected": 0}
+    hired, shortlisted_list, all_candidates = [], [], []
+    scores = []
+    missing_tally = {}
+    score_dist = {"strong": 0, "good": 0, "moderate": 0, "weak": 0}
+
+    for app in applications:
+        s = app.status
+        if s in ("applied", "reviewed"):
+            by_status["pending"] += 1
+        elif s == "shortlisted":
+            by_status["shortlisted"] += 1
+        elif s == "accepted":
+            by_status["accepted"] += 1
+        elif s == "rejected":
+            by_status["rejected"] += 1
+
+        candidate = db.query(Candidate).filter(Candidate.id == app.candidate_id).first()
+        mr = db.query(MatchResult).filter(
+            MatchResult.candidate_id == app.candidate_id,
+            MatchResult.job_id == job.id
+        ).first()
+
+        score = mr.match_score if mr else None
+        matched = mr.matched_skills or [] if mr else []
+        missing = mr.missing_skills or [] if mr else []
+        exp_match = mr.experience_match or "unknown" if mr else "unknown"
+        edu_match = mr.education_match or "unknown" if mr else "unknown"
+        analysis = mr.analysis or "" if mr else ""
+
+        if score is not None:
+            scores.append(score)
+            if score >= 80:   score_dist["strong"] += 1
+            elif score >= 60: score_dist["good"] += 1
+            elif score >= 40: score_dist["moderate"] += 1
+            else:             score_dist["weak"] += 1
+
+        for skill in missing:
+            missing_tally[skill] = missing_tally.get(skill, 0) + 1
+
+        entry = {
+            "name": candidate.full_name if candidate else "Unknown",
+            "email": candidate.email if candidate else None,
+            "phone": candidate.phone if candidate else None,
+            "score": score,
+            "status": s,
+            "matched_skills": matched,
+            "missing_skills": missing,
+            "experience_match": exp_match,
+            "education_match": edu_match,
+            "analysis": analysis,
+        }
+        all_candidates.append(entry)
+        if s == "accepted":
+            hired.append(entry)
+        elif s == "shortlisted":
+            shortlisted_list.append(entry)
+
+    all_candidates.sort(key=lambda x: -(x["score"] or 0))
+    hired.sort(key=lambda x: -(x["score"] or 0))
+    shortlisted_list.sort(key=lambda x: -(x["score"] or 0))
+    top_missing = [s for s, _ in sorted(missing_tally.items(), key=lambda x: -x[1])[:6]]
+
+    return {
+        "job_title": job.title,
+        "job_description": job.description or "",
+        "required_skills": job.required_skills or [],
+        "required_experience_years": job.required_experience_years,
+        "required_education": job.required_education,
+        "deadline": job.deadline.isoformat() if job.deadline else None,
+        "closed_at": datetime.now(timezone.utc).isoformat(),
+        "total_applicants": total,
+        "by_status": by_status,
+        "avg_score": round(sum(scores) / len(scores), 1) if scores else None,
+        "score_distribution": score_dist,
+        "top_missing_skills": top_missing,
+        "hired": hired,
+        "shortlisted": shortlisted_list,
+        "all_candidates": all_candidates,
+    }
+
 
 @router.patch("/{job_id}/toggle")
 def toggle_job(
@@ -293,7 +395,220 @@ def toggle_job(
         raise HTTPException(status_code=403, detail="Not authorised")
     job.is_open = not job.is_open
     db.commit()
+
+    if not job.is_open:
+        report_data = _generate_report(job, db)
+        existing = db.query(JobReport).filter(JobReport.job_id == job.id).first()
+        if existing:
+            existing.data = report_data
+            existing.generated_at = datetime.now(timezone.utc)
+        else:
+            db.add(JobReport(job_id=job.id, data=report_data))
+        db.commit()
+
     return {"is_open": job.is_open}
+
+
+@router.get("/{job_id}/report")
+def get_job_report(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    report = db.query(JobReport).filter(JobReport.job_id == job_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="No report available for this job")
+    return {"generated_at": report.generated_at.isoformat(), "data": report.data}
+
+@router.get("/{job_id}/report/pdf")
+def download_job_report_pdf(
+    job_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    report = db.query(JobReport).filter(JobReport.job_id == job_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="No report available for this job")
+
+    d = report.data
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=20*mm, rightMargin=20*mm,
+                            topMargin=20*mm, bottomMargin=20*mm)
+
+    from datetime import datetime as dt
+
+    title_style   = ParagraphStyle('t',  fontSize=18, fontName='Helvetica-Bold', textColor=colors.HexColor('#1e1b4b'), spaceAfter=4)
+    sub_style     = ParagraphStyle('s',  fontSize=9,  fontName='Helvetica',      textColor=colors.HexColor('#6b7280'), spaceAfter=12)
+    heading_style = ParagraphStyle('h',  fontSize=10, fontName='Helvetica-Bold', textColor=colors.HexColor('#374151'), spaceBefore=14, spaceAfter=6)
+    body_style    = ParagraphStyle('b',  fontSize=9,  fontName='Helvetica',      textColor=colors.HexColor('#374151'), spaceAfter=3)
+    muted_style   = ParagraphStyle('m',  fontSize=8,  fontName='Helvetica',      textColor=colors.HexColor('#9ca3af'), spaceAfter=2)
+    italic_style  = ParagraphStyle('i',  fontSize=8,  fontName='Helvetica-Oblique', textColor=colors.HexColor('#6b7280'), spaceAfter=6)
+
+    def section_header(text):
+        story.append(Spacer(1, 4))
+        story.append(Paragraph(text, heading_style))
+        story.append(HRFlowable(width='100%', thickness=0.5, color=colors.HexColor('#e5e7eb'), spaceAfter=6))
+
+    def match_badge(val):
+        icons = {'exceeds': '✓✓', 'meets': '✓', 'below': '✗', 'unknown': '—'}
+        return icons.get(val, '—')
+
+    story = []
+
+    # ── Header ──
+    story.append(Paragraph(d.get('job_title', 'Job Report'), title_style))
+    closed_raw = d.get('closed_at', '')
+    try:
+        closed_fmt = dt.fromisoformat(closed_raw).strftime('%B %d, %Y')
+    except Exception:
+        closed_fmt = closed_raw
+    generated = report.generated_at.strftime('%B %d, %Y') if report.generated_at else ''
+    story.append(Paragraph(f"Report generated {generated}  ·  Closed {closed_fmt}", sub_style))
+    story.append(HRFlowable(width='100%', thickness=1, color=colors.HexColor('#e5e7eb'), spaceAfter=14))
+
+    # ── Summary stats ──
+    bs  = d.get('by_status', {})
+    avg = d.get('avg_score')
+    sd  = d.get('score_distribution', {})
+    stat_data = [
+        ['Total', 'Hired', 'Shortlisted', 'Rejected', 'Pending', 'Avg Score'],
+        [str(d.get('total_applicants', 0)), str(bs.get('accepted', 0)),
+         str(bs.get('shortlisted', 0)), str(bs.get('rejected', 0)),
+         str(bs.get('pending', 0)), f"{avg}%" if avg is not None else '—'],
+    ]
+    st = Table(stat_data, colWidths=[170/6*mm]*6)
+    st.setStyle(TableStyle([
+        ('BACKGROUND',   (0,0),(-1,0), colors.HexColor('#f3f4f6')),
+        ('TEXTCOLOR',    (0,0),(-1,0), colors.HexColor('#6b7280')),
+        ('FONTNAME',     (0,0),(-1,0), 'Helvetica'), ('FONTSIZE',(0,0),(-1,0), 7.5),
+        ('FONTNAME',     (0,1),(-1,1), 'Helvetica-Bold'), ('FONTSIZE',(0,1),(-1,1), 15),
+        ('TEXTCOLOR',    (0,1),(-1,1), colors.HexColor('#1e1b4b')),
+        ('ALIGN',        (0,0),(-1,-1), 'CENTER'), ('VALIGN',(0,0),(-1,-1),'MIDDLE'),
+        ('BOX',          (0,0),(-1,-1), 0.5, colors.HexColor('#e5e7eb')),
+        ('INNERGRID',    (0,0),(-1,-1), 0.5, colors.HexColor('#e5e7eb')),
+        ('TOPPADDING',   (0,0),(-1,-1), 7), ('BOTTOMPADDING',(0,0),(-1,-1), 7),
+    ]))
+    story.append(st)
+
+    # ── Score distribution ──
+    if any(sd.get(k, 0) for k in ('strong','good','moderate','weak')):
+        section_header('Score Distribution')
+        dist_data = [
+            ['Strong (80–100)', 'Good (60–79)', 'Moderate (40–59)', 'Weak (0–39)'],
+            [str(sd.get('strong',0)), str(sd.get('good',0)), str(sd.get('moderate',0)), str(sd.get('weak',0))],
+        ]
+        dt2 = Table(dist_data, colWidths=[42.5*mm]*4)
+        dt2.setStyle(TableStyle([
+            ('BACKGROUND',  (0,0),(-1,0), colors.HexColor('#f9fafb')),
+            ('TEXTCOLOR',   (0,0),(-1,0), colors.HexColor('#6b7280')),
+            ('FONTNAME',    (0,0),(-1,0), 'Helvetica'), ('FONTSIZE',(0,0),(-1,0), 8),
+            ('FONTNAME',    (0,1),(-1,1), 'Helvetica-Bold'), ('FONTSIZE',(0,1),(-1,1), 13),
+            ('TEXTCOLOR',   (0,1),(0,1),  colors.HexColor('#16a34a')),
+            ('TEXTCOLOR',   (1,1),(1,1),  colors.HexColor('#2563eb')),
+            ('TEXTCOLOR',   (2,1),(2,1),  colors.HexColor('#d97706')),
+            ('TEXTCOLOR',   (3,1),(3,1),  colors.HexColor('#dc2626')),
+            ('ALIGN',       (0,0),(-1,-1),'CENTER'), ('VALIGN',(0,0),(-1,-1),'MIDDLE'),
+            ('BOX',         (0,0),(-1,-1), 0.5, colors.HexColor('#e5e7eb')),
+            ('INNERGRID',   (0,0),(-1,-1), 0.5, colors.HexColor('#e5e7eb')),
+            ('TOPPADDING',  (0,0),(-1,-1), 6), ('BOTTOMPADDING',(0,0),(-1,-1), 6),
+        ]))
+        story.append(dt2)
+
+    # ── Top missing skills ──
+    top_missing = d.get('top_missing_skills', [])
+    if top_missing:
+        section_header('Most Commonly Missing Skills')
+        story.append(Paragraph(', '.join(top_missing), body_style))
+
+    # ── Requirements ──
+    req_skills = d.get('required_skills', [])
+    req_exp    = d.get('required_experience_years')
+    req_edu    = d.get('required_education')
+    if req_skills or req_exp or req_edu:
+        section_header('Job Requirements')
+        if req_skills: story.append(Paragraph(f"Skills: {', '.join(req_skills)}", body_style))
+        if req_exp:    story.append(Paragraph(f"Experience: {req_exp} year(s)", body_style))
+        if req_edu:    story.append(Paragraph(f"Education: {req_edu}", body_style))
+
+    # ── Helper to render a candidate block ──
+    def render_candidate(c):
+        score_str = f"{c['score']}%" if c.get('score') is not None else '—'
+        name_row = Table(
+            [[Paragraph(f"<b>{c.get('name','Unknown')}</b>", body_style),
+              Paragraph(score_str, ParagraphStyle('sc', fontSize=13, fontName='Helvetica-Bold',
+                        textColor=colors.HexColor('#7c3aed'), alignment=TA_CENTER))]],
+            colWidths=[148*mm, 22*mm]
+        )
+        name_row.setStyle(TableStyle([('VALIGN',(0,0),(-1,-1),'MIDDLE')]))
+        story.append(name_row)
+        contact = '  ·  '.join(filter(None, [c.get('email'), c.get('phone')]))
+        if contact: story.append(Paragraph(contact, muted_style))
+        exp_b = match_badge(c.get('experience_match','unknown'))
+        edu_b = match_badge(c.get('education_match','unknown'))
+        story.append(Paragraph(f"Experience: {exp_b}  ·  Education: {edu_b}", muted_style))
+        if c.get('matched_skills'):
+            story.append(Paragraph(f"Matched: {', '.join(c['matched_skills'])}", muted_style))
+        if c.get('missing_skills'):
+            story.append(Paragraph(f"Missing: {', '.join(c['missing_skills'])}", muted_style))
+        if c.get('analysis'):
+            story.append(Paragraph(c['analysis'], italic_style))
+        story.append(Spacer(1, 6))
+
+    # ── Hired ──
+    hired = d.get('hired', [])
+    if hired:
+        section_header(f"Hired Candidates ({len(hired)})")
+        for c in hired: render_candidate(c)
+
+    # ── Shortlisted ──
+    shortlisted = d.get('shortlisted', [])
+    if shortlisted:
+        section_header(f"Shortlisted — Not Hired ({len(shortlisted)})")
+        for c in shortlisted: render_candidate(c)
+
+    # ── All candidates table ──
+    all_cands = d.get('all_candidates', [])
+    if all_cands:
+        section_header(f"All Candidates ({len(all_cands)})")
+        STATUS_LABELS = {'applied':'Pending','reviewed':'Pending','shortlisted':'Interview',
+                         'accepted':'Hired','rejected':'Rejected'}
+        rows = [['#', 'Name', 'Email', 'Score', 'Status', 'Exp', 'Edu']]
+        for i, c in enumerate(all_cands, 1):
+            rows.append([
+                str(i),
+                c.get('name','—')[:28],
+                (c.get('email') or '—')[:30],
+                f"{c['score']}%" if c.get('score') is not None else '—',
+                STATUS_LABELS.get(c.get('status',''), c.get('status','')),
+                match_badge(c.get('experience_match','unknown')),
+                match_badge(c.get('education_match','unknown')),
+            ])
+        tbl = Table(rows, colWidths=[8*mm, 42*mm, 52*mm, 14*mm, 20*mm, 10*mm, 10*mm])
+        tbl_style = [
+            ('BACKGROUND',   (0,0),(-1,0), colors.HexColor('#f3f4f6')),
+            ('FONTNAME',     (0,0),(-1,0), 'Helvetica-Bold'),
+            ('FONTSIZE',     (0,0),(-1,-1), 7.5),
+            ('FONTNAME',     (0,1),(-1,-1), 'Helvetica'),
+            ('TEXTCOLOR',    (0,0),(-1,0), colors.HexColor('#374151')),
+            ('TEXTCOLOR',    (0,1),(-1,-1), colors.HexColor('#374151')),
+            ('ALIGN',        (0,0),(-1,-1), 'LEFT'),
+            ('ALIGN',        (3,0),(6,-1), 'CENTER'),
+            ('VALIGN',       (0,0),(-1,-1), 'MIDDLE'),
+            ('BOX',          (0,0),(-1,-1), 0.5, colors.HexColor('#e5e7eb')),
+            ('INNERGRID',    (0,0),(-1,-1), 0.3, colors.HexColor('#e5e7eb')),
+            ('TOPPADDING',   (0,0),(-1,-1), 4), ('BOTTOMPADDING',(0,0),(-1,-1), 4),
+            ('ROWBACKGROUNDS',(0,1),(-1,-1), [colors.white, colors.HexColor('#f9fafb')]),
+        ]
+        tbl.setStyle(TableStyle(tbl_style))
+        story.append(tbl)
+
+    doc.build(story)
+    buf.seek(0)
+    filename = f"report_{d.get('job_title','job').replace(' ','_')}.pdf"
+    return StreamingResponse(buf, media_type='application/pdf',
+                             headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+
 
 @router.patch("/{job_id}")
 def update_job(

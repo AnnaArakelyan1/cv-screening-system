@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Form
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Form, BackgroundTasks
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from database import get_db
@@ -8,8 +8,9 @@ from models.application import Application
 from models.user import User
 from schemas.candidate import CandidateOut
 from utils.auth import get_current_user
-from utils.cv_parser import parse_cv, is_likely_cv, build_embedding_text
+from utils.cv_parser import parse_cv_fast, is_likely_cv, build_embedding_text
 from utils.matcher import get_embedding, cluster_candidates
+from database import SessionLocal
 from utils.email_sender import send_email
 from typing import List
 from pathlib import Path
@@ -21,8 +22,19 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 
 router = APIRouter()
 
+def _save_embedding(candidate_id: int, text: str):
+    db = SessionLocal()
+    try:
+        candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
+        if candidate:
+            candidate.embedding = get_embedding(text)
+            db.commit()
+    finally:
+        db.close()
+
 @router.post("/upload", response_model=CandidateOut)
 async def upload_cv(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     job_id: int = Form(...),
     full_name: str = Form(None),
@@ -43,15 +55,13 @@ async def upload_cv(
         raise HTTPException(status_code=400, detail="Only PDF and DOCX files are supported")
 
     file_bytes = await file.read()
-    parsed = parse_cv(file_bytes, file.filename)
+    parsed = parse_cv_fast(file_bytes, file.filename)
 
     if not is_likely_cv(parsed):
         raise HTTPException(status_code=400, detail="The uploaded file does not appear to be a CV")
 
     resolved_name  = full_name or parsed.get("full_name")
     resolved_email = email    or parsed.get("email")
-
-    embedding = get_embedding(build_embedding_text(parsed))
 
     if resolved_email:
         existing = db.query(Candidate).filter(Candidate.email == resolved_email).first()
@@ -81,30 +91,29 @@ async def upload_cv(
         experience=parsed.get("experience"),
         raw_text=parsed["raw_text"],
         cv_filename=stored_filename,
-        embedding=embedding,
+        embedding=None,
         uploaded_by=current_user.id
     )
     db.add(candidate)
     db.commit()
     db.refresh(candidate)
+    background_tasks.add_task(_save_embedding, candidate.id, build_embedding_text(parsed))
 
     db.add(Application(candidate_id=candidate.id, job_id=job_id))
     db.commit()
 
     if candidate.email:
-        try:
-            send_email(
-                to_email=candidate.email,
-                subject=f"Application Received – {job.title}",
-                body=f"""Dear {candidate.full_name or 'Candidate'},
+        background_tasks.add_task(
+            send_email,
+            candidate.email,
+            f"Application Received – {job.title}",
+            f"""Dear {candidate.full_name or 'Candidate'},
 
 Thank you for your interest in the {job.title} position. We have successfully received your CV and our HR team will review your profile shortly.
 
 Best regards,
 HR Team"""
-            )
-        except Exception as e:
-            logging.warning(f"Failed to send upload email to {candidate.email}: {e}")
+        )
 
     return candidate
 

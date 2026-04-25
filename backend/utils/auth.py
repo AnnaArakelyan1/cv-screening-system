@@ -36,7 +36,11 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     except JWTError:
         raise credentials_exception
 
-    user = db.query(User).filter(User.id == int(user_id)).first()
+    try:
+        user = db.query(User).filter(User.id == int(user_id)).first()
+    except ValueError:
+        # legacy tokens stored email instead of id
+        user = db.query(User).filter(User.email == user_id).first()
     if user is None:
         raise credentials_exception
     if not user.is_active:

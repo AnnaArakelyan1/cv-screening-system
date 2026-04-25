@@ -248,3 +248,226 @@
   color: var(--muted);
   padding: 2rem 0;
 }
+
+.act-report { background: rgba(96,165,250,0.12); color: #60a5fa; border: 1.5px solid rgba(96,165,250,0.25); }
+
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2rem;
+  box-shadow: var(--shadow-lg);
+}
+
+.report-modal {
+  width: 580px;
+  max-width: 95vw;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.report-modal h3 {
+  font-size: 1.1rem;
+  color: var(--navy);
+  margin-bottom: 0.2rem;
+}
+
+.report-generated {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 1.25rem;
+}
+
+.report-stats {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.6rem;
+  margin-bottom: 1.5rem;
+}
+
+.report-stat {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 0.5rem;
+  text-align: center;
+}
+
+.report-stat-num {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--navy);
+  line-height: 1;
+}
+
+.report-stat-label {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 0.25rem;
+}
+
+.report-section {
+  margin-bottom: 1.25rem;
+}
+
+.report-section h4 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.report-candidate {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+  gap: 1rem;
+}
+
+.report-candidate:last-child { border-bottom: none; }
+
+.report-cand-name {
+  font-weight: 500;
+  color: var(--navy);
+  font-size: 0.9rem;
+}
+
+.report-cand-email {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.report-cand-score {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+.report-empty {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-style: italic;
+  margin-bottom: 1rem;
+}
+
+.report-cand-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
+
+.report-missing {
+  font-size: 0.78rem;
+  color: #f87171;
+  margin-top: 0.2rem;
+}
+
+.report-analysis {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-style: italic;
+  margin-top: 0.25rem;
+  line-height: 1.4;
+}
+
+.report-dist {
+  display: flex;
+  gap: 1rem;
+}
+
+.report-dist-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.report-dist-num {
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.report-dist-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.report-table th {
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.report-table td {
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+
+.report-table tr:last-child td { border-bottom: none; }
+.report-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+.report-td-muted { color: var(--muted); font-size: 0.8rem; }
+.report-td-score { font-weight: 700; color: var(--primary); }
+.report-td-sub   { font-size: 0.75rem; color: var(--muted); }
+
+.report-status-badge {
+  padding: 0.15rem 0.5rem;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.report-status-badge.accepted   { background: rgba(52,211,153,0.15); color: #34d399; }
+.report-status-badge.shortlisted{ background: rgba(96,165,250,0.15); color: #60a5fa; }
+.report-status-badge.rejected   { background: rgba(248,113,113,0.12); color: #f87171; }
+.report-status-badge.applied,
+.report-status-badge.reviewed   { background: rgba(255,255,255,0.07); color: var(--muted); }
+
+.cancel-btn {
+  padding: 0.6rem 1.25rem;
+  background: none;
+  border: 1.5px solid var(--border);
+  color: var(--muted);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+.cancel-btn:hover { background: rgba(255,255,255,0.06); color: var(--text); }

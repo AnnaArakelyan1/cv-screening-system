@@ -250,6 +250,27 @@ def _gemini_parse(raw_text: str) -> dict:
             "skills": [], "education": None, "experience": None}
 
 
+def parse_cv_fast(file_bytes: bytes, filename: str) -> dict:
+    """Fast regex-only parse — no Gemini call. Used on upload for instant response.
+    Gemini enrichment happens lazily at match time."""
+    if filename.endswith(".pdf"):
+        raw_text = extract_text_from_pdf(file_bytes)
+    elif filename.endswith(".docx"):
+        raw_text = extract_text_from_docx(file_bytes)
+    else:
+        raw_text = file_bytes.decode("utf-8", errors="ignore")
+
+    return {
+        "full_name": extract_name(raw_text),
+        "email": extract_email(raw_text),
+        "phone": extract_phone(raw_text),
+        "skills": extract_skills(raw_text),
+        "education": extract_section(raw_text, EDUCATION_KEYWORDS, EXPERIENCE_KEYWORDS),
+        "experience": extract_section(raw_text, EXPERIENCE_KEYWORDS, EDUCATION_KEYWORDS),
+        "raw_text": raw_text,
+    }
+
+
 def parse_cv(file_bytes: bytes, filename: str) -> dict:
     if filename.endswith(".pdf"):
         raw_text = extract_text_from_pdf(file_bytes)

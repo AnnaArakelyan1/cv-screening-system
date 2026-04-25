@@ -16,3 +16,5 @@ numpy
 deep-translator
 sentence-transformers
 google-genai
+reportlab
+watchfiles
