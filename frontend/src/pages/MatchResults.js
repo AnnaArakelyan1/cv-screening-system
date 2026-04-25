@@ -24,13 +24,16 @@ const MatchResults = () => {
   const [emailModal, setEmailModal] = useState(null);
   const [emailForm, setEmailForm] = useState({ subject: '', body: '' });
   const [sending, setSending] = useState(false);
+  const [showRejected, setShowRejected] = useState(false);
+  const [showShortlisted, setShowShortlisted] = useState(true);
+  const [expandedAnalysis, setExpandedAnalysis] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const matchRes = await API.get(`/jobs/${id}/match`);
-        setResults(matchRes.data.results);
+        const res = await API.get(`/jobs/${id}/match`);
+        setResults(res.data.results);
       } catch (err) {
         console.error(err);
       }
@@ -97,19 +100,132 @@ const MatchResults = () => {
     return '#f87171';
   };
 
-  const getRankEmoji = (index) => {
-    if (index === 0) return { label: '#1', color: '#fbbf24' };
-    if (index === 1) return { label: '#2', color: '#a99cf8' };
-    if (index === 2) return { label: '#3', color: '#f87171' };
-    return { label: `#${index + 1}`, color: '#7880a0' };
-  };
-
   const matchLabel = (val) => {
     if (val === 'exceeds') return { text: '↑', color: '#34d399' };
     if (val === 'meets')   return { text: '✓', color: '#34d399' };
     if (val === 'below')   return { text: '↓', color: '#f87171' };
     return { text: '—', color: '#7880a0' };
   };
+
+  const renderCard = (r, rank) => {
+    const status = r.application_status;
+    const expL = matchLabel(r.experience_match);
+    const eduL = matchLabel(r.education_match);
+
+    return (
+      <div className={`result-card result-card--${status}`} key={r.candidate.id}>
+        <div className="rc-rank" style={{ color: getScoreColor(r.match_score) }}>#{rank}</div>
+
+        <div className="rc-info">
+          <div className="rc-name-row">
+            <span className="rc-name">{r.candidate.full_name || 'Unknown'}</span>
+            <span className={`status-badge ${status}`}>{STATUS_LABELS[status] || status}</span>
+          </div>
+          <div className="rc-email">{r.candidate.email || '—'}</div>
+          <div className="rc-skills">
+            {(r.candidate.skills || []).slice(0, 5).map(s => (
+              <span key={s} className="skill-tag">{s}</span>
+            ))}
+            {(r.candidate.skills || []).length > 5 && (
+              <span className="skill-tag more">+{r.candidate.skills.length - 5}</span>
+            )}
+          </div>
+        </div>
+
+        <div className="rc-score-col">
+          <div className="score-circle" style={{ borderColor: getScoreColor(r.match_score) }}>
+            <span className="score-number" style={{ color: getScoreColor(r.match_score) }}>{r.match_score}%</span>
+            <span className="score-label">match</span>
+          </div>
+          <div className="rc-breakdown">
+            <span>Exp <span style={{ color: expL.color }}>{expL.text}</span></span>
+            <span>Edu <span style={{ color: eduL.color }}>{eduL.text}</span></span>
+          </div>
+        </div>
+
+        <div className="rc-detail-col">
+          {r.analysis && (
+            <div>
+              <p
+                className="rc-analysis"
+                style={expandedAnalysis[r.candidate.id] ? { WebkitLineClamp: 'unset', lineClamp: 'unset' } : {}}
+              >{r.analysis}</p>
+              <button
+                className="rc-expand-btn"
+                onClick={() => setExpandedAnalysis(prev => ({ ...prev, [r.candidate.id]: !prev[r.candidate.id] }))}
+              >{expandedAnalysis[r.candidate.id] ? 'Show less ▲' : 'Read more ▼'}</button>
+            </div>
+          )}
+          {(r.matched_skills || []).length > 0 && (
+            <div className="rc-chip-row">
+              {r.matched_skills.slice(0, 3).map(s => (
+                <span key={s} className="skill-match-tag matched">{s}</span>
+              ))}
+            </div>
+          )}
+          {(r.missing_skills || []).length > 0 && (
+            <div className="rc-chip-row">
+              {r.missing_skills.slice(0, 2).map(s => (
+                <span key={s} className="skill-match-tag missing">{s}</span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="rc-actions">
+          {r.candidate.cv_filename && (
+            <button className="act-sm act-cv" onClick={() => downloadCV(r.candidate.id, r.candidate.cv_filename)}>↓ CV</button>
+          )}
+          <button className="act-sm act-email" onClick={() => openEmailModal(r.candidate)}>✉</button>
+
+          {(status === 'applied' || status === 'reviewed') && (<>
+            <button className="act-sm act-shortlist" onClick={() => handleStatusChange(r.candidate.id, 'shortlisted')}>
+              Interview
+            </button>
+            <button className="act-sm act-reject" onClick={() => handleStatusChange(r.candidate.id, 'rejected')}>
+              Reject
+            </button>
+          </>)}
+
+          {status === 'shortlisted' && (<>
+            <button className="act-sm act-accept" onClick={() => handleStatusChange(r.candidate.id, 'accepted')}>
+              Hire
+            </button>
+            <button className="act-sm act-reject" onClick={() => handleStatusChange(r.candidate.id, 'rejected')}>
+              Reject
+            </button>
+            <button className="act-sm act-restore" onClick={() => handleStatusChange(r.candidate.id, 'applied')}>
+              Undo
+            </button>
+          </>)}
+
+          {(status === 'accepted' || status === 'rejected') && (
+            <button className="act-sm act-restore" onClick={() => handleStatusChange(r.candidate.id, 'applied')}>
+              Restore
+            </button>
+          )}
+
+          <button className="act-sm act-remove" onClick={() => handleUnassign(r.candidate.id)}>Remove</button>
+        </div>
+      </div>
+    );
+  };
+
+  const STATUS_LABELS = {
+    applied: 'Pending',
+    reviewed: 'Reviewed',
+    shortlisted: 'Interview',
+    accepted: 'Hired',
+    rejected: 'Rejected',
+  };
+
+  const byScore = [...results].sort((a, b) => b.match_score - a.match_score);
+  const scoreRank = Object.fromEntries(byScore.map((r, i) => [r.candidate.id, i + 1]));
+
+  const shortlisted = results.filter(r => r.application_status === 'shortlisted');
+  const pending     = results.filter(r => ['applied', 'reviewed'].includes(r.application_status));
+  const accepted    = results.filter(r => r.application_status === 'accepted');
+  const rejected    = results.filter(r => r.application_status === 'rejected');
 
   return (
     <div className="page">
@@ -121,87 +237,69 @@ const MatchResults = () => {
       ) : results.length === 0 ? (
         <p className="empty-msg">No candidates have applied for this job yet.</p>
       ) : (
-        <div className="section">
-          <div className="section-header applied-header">
-            <span>Applicants</span>
-            <span className="count-badge">{results.length}</span>
-          </div>
-          <div className="results-list">
-            {results.map((r, index) => {
-              const rank = getRankEmoji(index);
-              const expL = matchLabel(r.experience_match);
-              const eduL = matchLabel(r.education_match);
-              return (
-                <div className="result-card" key={r.candidate.id}>
-                  <div className="rc-rank" style={{ color: rank.color }}>{rank.label}</div>
-
-                  <div className="rc-info">
-                    <div className="rc-name-row">
-                      <span className="rc-name">{r.candidate.full_name || 'Unknown'}</span>
-                      <span className={`status-badge ${r.application_status}`}>{r.application_status}</span>
-                    </div>
-                    <div className="rc-email">{r.candidate.email || '—'}</div>
-                    <div className="rc-skills">
-                      {(r.candidate.skills || []).slice(0, 5).map(s => (
-                        <span key={s} className="skill-tag">{s}</span>
-                      ))}
-                      {(r.candidate.skills || []).length > 5 && (
-                        <span className="skill-tag more">+{r.candidate.skills.length - 5}</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="rc-score-col">
-                    <div className="score-circle" style={{ borderColor: getScoreColor(r.match_score) }}>
-                      <span className="score-number" style={{ color: getScoreColor(r.match_score) }}>{r.match_score}%</span>
-                      <span className="score-label">match</span>
-                    </div>
-                    <div className="rc-breakdown">
-                      <span>Exp <span style={{ color: expL.color }}>{expL.text}</span></span>
-                      <span>Edu <span style={{ color: eduL.color }}>{eduL.text}</span></span>
-                    </div>
-                  </div>
-
-                  <div className="rc-detail-col">
-                    {r.analysis && <p className="rc-analysis">{r.analysis}</p>}
-                    {(r.matched_skills || []).length > 0 && (
-                      <div className="rc-chip-row">
-                        {r.matched_skills.slice(0, 3).map(s => (
-                          <span key={s} className="skill-match-tag matched">{s}</span>
-                        ))}
-                      </div>
-                    )}
-                    {(r.missing_skills || []).length > 0 && (
-                      <div className="rc-chip-row">
-                        {r.missing_skills.slice(0, 2).map(s => (
-                          <span key={s} className="skill-match-tag missing">{s}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="rc-actions">
-                    {r.candidate.cv_filename && (
-                      <button className="act-sm act-cv" onClick={() => downloadCV(r.candidate.id, r.candidate.cv_filename)}>↓ CV</button>
-                    )}
-                    <button className="act-sm act-email" onClick={() => openEmailModal(r.candidate)}>✉</button>
-                    <button
-                      className={`act-sm act-accept ${r.application_status === 'accepted' ? 'active' : ''}`}
-                      onClick={() => handleStatusChange(r.candidate.id, 'accepted')}
-                      disabled={r.application_status === 'accepted'}
-                    >✓</button>
-                    <button
-                      className={`act-sm act-reject ${r.application_status === 'rejected' ? 'active' : ''}`}
-                      onClick={() => handleStatusChange(r.candidate.id, 'rejected')}
-                      disabled={r.application_status === 'rejected'}
-                    >✕</button>
-                    <button className="act-sm act-remove" onClick={() => handleUnassign(r.candidate.id)}>Remove</button>
-                  </div>
+        <>
+          {shortlisted.length > 0 && (
+            <div className="section">
+              <div
+                className="section-header shortlisted-header"
+                onClick={() => setShowShortlisted(v => !v)}
+                style={{ cursor: 'pointer' }}
+              >
+                <span>Called for Interview</span>
+                <span className="count-badge">{shortlisted.length}</span>
+                <span className="toggle-arrow">{showShortlisted ? '▲' : '▼'}</span>
+              </div>
+              {showShortlisted && (
+                <div className="results-list">
+                  {shortlisted.map(r => renderCard(r, scoreRank[r.candidate.id]))}
                 </div>
-              );
-            })}
-          </div>
-        </div>
+              )}
+            </div>
+          )}
+
+          {accepted.length > 0 && (
+            <div className="section">
+              <div className="section-header accepted-header">
+                <span>Hired</span>
+                <span className="count-badge">{accepted.length}</span>
+              </div>
+              <div className="results-list">
+                {accepted.map(r => renderCard(r, scoreRank[r.candidate.id]))}
+              </div>
+            </div>
+          )}
+
+          {pending.length > 0 && (
+            <div className="section">
+              <div className="section-header pending-header">
+                <span>Pending Review</span>
+                <span className="count-badge">{pending.length}</span>
+              </div>
+              <div className="results-list">
+                {pending.map(r => renderCard(r, scoreRank[r.candidate.id]))}
+              </div>
+            </div>
+          )}
+
+          {rejected.length > 0 && (
+            <div className="section">
+              <div
+                className="section-header rejected-header"
+                onClick={() => setShowRejected(v => !v)}
+                style={{ cursor: 'pointer' }}
+              >
+                <span>Rejected</span>
+                <span className="count-badge">{rejected.length}</span>
+                <span className="toggle-arrow">{showRejected ? '▲' : '▼'}</span>
+              </div>
+              {showRejected && (
+                <div className="results-list">
+                  {rejected.map(r => renderCard(r, scoreRank[r.candidate.id]))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {emailModal && (

@@ -48,18 +48,24 @@ async def upload_cv(
     if not is_likely_cv(parsed):
         raise HTTPException(status_code=400, detail="The uploaded file does not appear to be a CV")
 
+    resolved_name  = full_name or parsed.get("full_name")
+    resolved_email = email    or parsed.get("email")
+
     embedding = get_embedding(build_embedding_text(parsed))
 
-    if parsed.get("email"):
-        existing = db.query(Candidate).filter(Candidate.email == parsed["email"]).first()
+    if resolved_email:
+        existing = db.query(Candidate).filter(Candidate.email == resolved_email).first()
         if existing:
+            if full_name:
+                existing.full_name = full_name
             existing_app = db.query(Application).filter(
                 Application.candidate_id == existing.id,
                 Application.job_id == job_id
             ).first()
             if not existing_app:
                 db.add(Application(candidate_id=existing.id, job_id=job_id))
-                db.commit()
+            db.commit()
+            db.refresh(existing)
             return existing
 
     ext = Path(file.filename).suffix
@@ -67,8 +73,8 @@ async def upload_cv(
     (UPLOAD_DIR / stored_filename).write_bytes(file_bytes)
 
     candidate = Candidate(
-        full_name=full_name or parsed["full_name"],
-        email=email or parsed["email"],
+        full_name=resolved_name,
+        email=resolved_email,
         phone=parsed["phone"],
         skills=parsed["skills"],
         education=parsed.get("education"),
@@ -170,8 +176,8 @@ def delete_candidate(
     candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
     if not candidate:
         raise HTTPException(status_code=404, detail="Candidate not found")
-    if not current_user.is_admin and candidate.uploaded_by != current_user.id:
-        raise HTTPException(status_code=403, detail="You can only delete candidates you uploaded")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only admins can delete candidates")
     db.delete(candidate)
     db.commit()
     return {"message": "Candidate deleted successfully"}

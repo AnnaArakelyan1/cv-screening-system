@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import API from '../api';
 import Toast from '../components/Toast';
+import { useAuth } from '../context/AuthContext';
 import './Dashboard.css';
 
 const PAGE_SIZE = 25;
@@ -45,6 +46,7 @@ const Dashboard = () => {
   const [sortDir, setSortDir]             = useState('desc');
   const [expandedSkills, setExpandedSkills] = useState(new Set());
 
+  const { user } = useAuth();
   const showToast = (msg, type = 'success') => setToast({ message: msg, type });
 
   useEffect(() => {
@@ -251,7 +253,9 @@ const Dashboard = () => {
                         {c.cv_filename && (
                           <button className="act-btn act-download" onClick={() => downloadCV(c.id, c.cv_filename)}>↓ CV</button>
                         )}
-                        <button className="act-btn act-delete" onClick={() => handleDelete(c.id)}>Delete</button>
+                        {user?.is_admin && (
+                          <button className="act-btn act-delete" onClick={() => handleDelete(c.id)}>Delete</button>
+                        )}
                       </div>
                     </td>
                   </tr>

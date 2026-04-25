@@ -58,10 +58,17 @@ const Profile = () => {
         payload.current_password = editForm.current_password;
         payload.new_password = editForm.new_password;
       }
+      const emailChanged = payload.email && payload.email !== me.email;
+      const passwordChanged = !!payload.new_password;
       const res = await API.patch('/users/me', payload);
       setMe(res.data);
       setEditOpen(false);
-      showToast('Profile updated successfully.');
+      if (emailChanged || passwordChanged) {
+        showToast('Profile updated. Please log in again.');
+        setTimeout(() => { logout(); navigate('/login'); }, 1500);
+      } else {
+        showToast('Profile updated successfully.');
+      }
     } catch (err) {
       showToast(err.response?.data?.detail || 'Failed to update profile.', 'error');
     }
@@ -180,39 +187,37 @@ const Profile = () => {
                 </div>
               </div>
 
-              <div className="edit-divider">
-                <span>Change Password <span className="optional">(optional)</span></span>
-              </div>
-
-              <div className="edit-section">
-                <div className="pw-field">
-                  <label>Current Password</label>
-                  <input
-                    type="password"
-                    placeholder="Required only if changing password"
-                    value={editForm.current_password}
-                    onChange={e => setEditForm({ ...editForm, current_password: e.target.value })}
-                  />
-                </div>
-                <div className="pw-field">
-                  <label>New Password</label>
-                  <input
-                    type="password"
-                    placeholder="At least 6 characters"
-                    value={editForm.new_password}
-                    onChange={e => setEditForm({ ...editForm, new_password: e.target.value })}
-                  />
-                </div>
-                <div className="pw-field">
-                  <label>Confirm New Password</label>
-                  <input
-                    type="password"
-                    placeholder="Repeat new password"
-                    value={editForm.confirm_password}
-                    onChange={e => setEditForm({ ...editForm, confirm_password: e.target.value })}
-                  />
-                </div>
-              </div>
+              {me.is_admin ? (
+                <>
+                  <div className="edit-divider">
+                    <span>Change Password <span className="optional">(optional)</span></span>
+                  </div>
+                  <div className="edit-section">
+                    <div className="pw-field">
+                      <label>Current Password</label>
+                      <input type="password" placeholder="Required to change password"
+                        value={editForm.current_password}
+                        onChange={e => setEditForm({ ...editForm, current_password: e.target.value })} />
+                    </div>
+                    <div className="pw-field">
+                      <label>New Password</label>
+                      <input type="password" placeholder="At least 6 characters"
+                        value={editForm.new_password}
+                        onChange={e => setEditForm({ ...editForm, new_password: e.target.value })} />
+                    </div>
+                    <div className="pw-field">
+                      <label>Confirm New Password</label>
+                      <input type="password" placeholder="Repeat new password"
+                        value={editForm.confirm_password}
+                        onChange={e => setEditForm({ ...editForm, confirm_password: e.target.value })} />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p style={{ fontSize: '0.82rem', color: 'var(--muted)', margin: '0.25rem 0' }}>
+                  To change your password, contact your administrator.
+                </p>
+              )}
 
               <div className="modal-actions">
                 <button type="submit" className="pw-submit-btn" disabled={saving}>

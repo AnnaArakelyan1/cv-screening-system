@@ -15,6 +15,9 @@ class ProfileUpdate(BaseModel):
     current_password: Optional[str] = None
     new_password: Optional[str] = None
 
+class SetPassword(BaseModel):
+    new_password: str
+
 @router.patch("/me", response_model=UserOut)
 def update_me(
     data: ProfileUpdate,
@@ -30,17 +33,37 @@ def update_me(
         current_user.email = data.email
 
     if data.new_password:
+        if not current_user.is_admin:
+            raise HTTPException(status_code=403, detail="Password changes must be done by an administrator")
         if not data.current_password:
-            raise HTTPException(status_code=400, detail="Current password required to set a new one")
+            raise HTTPException(status_code=400, detail="Current password is required")
         if not verify_password(data.current_password, current_user.hashed_password):
             raise HTTPException(status_code=400, detail="Current password is incorrect")
         if len(data.new_password) < 6:
-            raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
         current_user.hashed_password = hash_password(data.new_password)
 
     db.commit()
     db.refresh(current_user)
     return current_user
+
+@router.patch("/{user_id}/set-password")
+def set_password(
+    user_id: int,
+    data: SetPassword,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only admins can set passwords")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    user.hashed_password = hash_password(data.new_password)
+    db.commit()
+    return {"message": f"Password updated for {user.email}"}
 
 @router.get("/me", response_model=UserOut)
 def get_me(current_user: User = Depends(get_current_user)):

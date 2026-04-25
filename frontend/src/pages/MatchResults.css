@@ -41,10 +41,33 @@
   font-size: 0.9rem;
 }
 
-.applied-header {
+.applied-header, .pending-header {
   background: rgba(255,255,255,0.04);
   color: var(--muted);
   border: 1px solid var(--border);
+}
+
+.shortlisted-header {
+  background: rgba(96,165,250,0.1);
+  color: #60a5fa;
+  border: 1px solid rgba(96,165,250,0.25);
+}
+
+.accepted-header {
+  background: rgba(52,211,153,0.1);
+  color: #34d399;
+  border: 1px solid rgba(52,211,153,0.25);
+}
+
+.rejected-header {
+  background: rgba(255,255,255,0.03);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.toggle-arrow {
+  margin-left: auto;
+  font-size: 0.75rem;
 }
 
 .count-badge {
@@ -71,14 +94,17 @@
   grid-template-columns: 38px 1fr 90px 200px auto;
   align-items: center;
   gap: 1rem;
-  border-left: 3px solid var(--primary);
-  transition: box-shadow 0.15s, border-color 0.15s;
+  border-left: 3px solid var(--border);
+  transition: box-shadow 0.15s;
 }
 
-.result-card:hover {
-  box-shadow: var(--shadow);
-  border-color: var(--primary);
-}
+.result-card:hover { box-shadow: var(--shadow); }
+
+.result-card--shortlisted { border-left-color: #60a5fa; }
+.result-card--accepted    { border-left-color: #34d399; }
+.result-card--rejected    { border-left-color: var(--border); opacity: 0.6; }
+.result-card--applied,
+.result-card--reviewed    { border-left-color: var(--primary); }
 
 .rc-rank {
   font-weight: 700;
@@ -147,10 +173,11 @@
   white-space: nowrap;
 }
 
-.status-badge.applied   { background: rgba(124,108,248,0.15); color: #a99cf8; }
-.status-badge.reviewed  { background: rgba(251,191,36,0.12);  color: var(--warning); }
-.status-badge.accepted  { background: rgba(52,211,153,0.12);  color: #34d399; }
-.status-badge.rejected  { background: rgba(248,113,113,0.12); color: #f87171; }
+.status-badge.applied     { background: rgba(124,108,248,0.15); color: #a99cf8; }
+.status-badge.reviewed   { background: rgba(251,191,36,0.12);  color: var(--warning); }
+.status-badge.shortlisted { background: rgba(96,165,250,0.15);  color: #60a5fa; }
+.status-badge.accepted   { background: rgba(52,211,153,0.12);  color: #34d399; }
+.status-badge.rejected   { background: rgba(248,113,113,0.12); color: #f87171; }
 
 .rc-score-col {
   text-align: center;
@@ -207,6 +234,18 @@
   opacity: 0.8;
 }
 
+.rc-expand-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 2px;
+  transition: color 0.15s;
+}
+.rc-expand-btn:hover { color: var(--primary); }
+
 .rc-chip-row {
   display: flex;
   flex-wrap: wrap;
@@ -247,13 +286,13 @@
 .act-sm:hover:not(:disabled) { opacity: 0.8; }
 .act-sm:disabled { opacity: 0.45; cursor: default; }
 
-.act-cv    { background: rgba(124,108,248,0.14); color: #a99cf8; border-color: rgba(124,108,248,0.25); }
-.act-email { background: rgba(255,255,255,0.05); color: var(--muted); border-color: var(--border); }
-.act-accept { background: none; border-color: rgba(52,211,153,0.4); color: #34d399; }
-.act-accept.active { background: rgba(52,211,153,0.2); color: #34d399; }
-.act-reject { background: none; border-color: rgba(248,113,113,0.4); color: #f87171; }
-.act-reject.active { background: rgba(248,113,113,0.15); color: #f87171; }
-.act-remove { background: none; border-color: rgba(248,113,113,0.25); color: #f87171; font-size: 0.7rem; }
+.act-cv       { background: rgba(124,108,248,0.14); color: #a99cf8;  border-color: rgba(124,108,248,0.25); }
+.act-email    { background: rgba(255,255,255,0.05); color: var(--muted); border-color: var(--border); }
+.act-shortlist { background: rgba(96,165,250,0.12); color: #60a5fa;  border-color: rgba(96,165,250,0.3); }
+.act-accept   { background: rgba(52,211,153,0.12);  color: #34d399;  border-color: rgba(52,211,153,0.3); }
+.act-reject   { background: rgba(248,113,113,0.12); color: #f87171;  border-color: rgba(248,113,113,0.3); }
+.act-restore  { background: rgba(255,255,255,0.05); color: var(--muted); border-color: var(--border); font-size: 0.7rem; }
+.act-remove   { background: none; border-color: rgba(248,113,113,0.2); color: #f87171; font-size: 0.7rem; }
 .act-remove:hover { background: rgba(248,113,113,0.1); }
 
 .assign-btn {

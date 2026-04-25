@@ -8,6 +8,9 @@ const Users = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
+  const [pwModal, setPwModal] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [pwSaving, setPwSaving] = useState(false);
 
   const showToast = (message, type = 'success') => setToast({ message, type });
 
@@ -53,6 +56,23 @@ const Users = () => {
     } catch (err) {
       showToast(err.response?.data?.detail || 'Failed to update user.', 'error');
     }
+  };
+
+  const handleSetPassword = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      showToast('Password must be at least 6 characters.', 'error');
+      return;
+    }
+    setPwSaving(true);
+    try {
+      await API.patch(`/users/${pwModal.id}/set-password`, { new_password: newPassword });
+      showToast(`Password updated for ${pwModal.full_name}.`);
+      setPwModal(null);
+      setNewPassword('');
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Failed to update password.', 'error');
+    }
+    setPwSaving(false);
   };
 
   const hrUsers = users.filter(u => !u.is_admin);
@@ -166,6 +186,9 @@ const Users = () => {
                             >
                               {u.is_active ? 'Deactivate' : 'Activate'}
                             </button>
+                            <button className="toggle-btn activate" onClick={() => { setPwModal(u); setNewPassword(''); }}>
+                              Set Password
+                            </button>
                             <button className="delete-btn" onClick={() => handleDelete(u.id, u.full_name)}>
                               Delete
                             </button>
@@ -180,6 +203,28 @@ const Users = () => {
           )}
         </div>
       </div>
+
+      {pwModal && (
+        <div className="modal-overlay" onClick={() => setPwModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h3>Set Password</h3>
+            <p className="modal-to">{pwModal.full_name} · {pwModal.email}</p>
+            <input
+              type="password"
+              placeholder="New password (min 6 characters)"
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              autoFocus
+            />
+            <div className="modal-actions">
+              <button className="create-btn" style={{ marginTop: 0 }} onClick={handleSetPassword} disabled={pwSaving}>
+                {pwSaving ? 'Saving...' : 'Set Password'}
+              </button>
+              <button className="cancel-btn" onClick={() => setPwModal(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>

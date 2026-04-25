@@ -233,6 +233,9 @@ async def public_apply(
         ).first()
         if existing_app:
             raise HTTPException(status_code=400, detail="You have already applied to this position")
+        if full_name:
+            candidate.full_name = full_name
+        db.commit()
     else:
         embedding = get_embedding(build_embedding_text(parsed))
         ext = Path(file.filename).suffix
@@ -321,8 +324,8 @@ def delete_job(
     job = db.query(Job).filter(Job.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    if not current_user.is_admin and job.created_by != current_user.id:
-        raise HTTPException(status_code=403, detail="You can only delete your own job postings")
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Only admins can delete job postings")
     db.delete(job)
     db.commit()
     return {"message": "Job deleted successfully"}

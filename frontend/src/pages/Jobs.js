@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import API from '../api';
 import Toast from '../components/Toast';
+import { useAuth } from '../context/AuthContext';
 import './Jobs.css';
 
 const Jobs = () => {
@@ -22,6 +23,7 @@ const Jobs = () => {
   const [expandedSkills, setExpandedSkills] = useState(new Set());
   const navigate = useNavigate();
 
+  const { user } = useAuth();
   const showToast = (msg, type = 'success') => setToast({ message: msg, type });
 
   const fetchJobs = async () => {
@@ -270,9 +272,11 @@ const Jobs = () => {
                       >
                         {job.is_open ? 'Close' : 'Reopen'}
                       </button>
-                      <button className="act-btn act-delete" onClick={() => handleDelete(job.id)}>
-                        Delete
-                      </button>
+                      {user?.is_admin && (
+                        <button className="act-btn act-delete" onClick={() => handleDelete(job.id)}>
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
