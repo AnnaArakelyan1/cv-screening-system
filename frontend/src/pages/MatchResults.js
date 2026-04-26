@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import API from '../api';
 import './MatchResults.css';
@@ -29,18 +29,30 @@ const MatchResults = () => {
   const [expandedAnalysis, setExpandedAnalysis] = useState({});
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await API.get(`/jobs/${id}/match`);
-        setResults(res.data.results);
-      } catch (err) {
-        console.error(err);
-      }
+  const fetchData = useCallback(async () => {
+    try {
+      const res = await API.get(`/jobs/${id}/match`);
+      setResults(res.data.results);
+      return res.data.results;
+    } catch (err) {
+      console.error(err);
+      return [];
+    } finally {
       setLoading(false);
-    };
-    fetchData();
+    }
   }, [id]);
+
+  useEffect(() => {
+    let timer;
+    const poll = async () => {
+      const data = await fetchData();
+      if (data.some(r => r.processing)) {
+        timer = setTimeout(poll, 5000);
+      }
+    };
+    poll();
+    return () => clearTimeout(timer);
+  }, [fetchData]);
 
   const handleStatusChange = async (candidateId, status) => {
     try {
@@ -94,6 +106,38 @@ const MatchResults = () => {
     setSending(false);
   };
 
+  const anonymizeAnalysis = (analysis, candidate) => {
+    if (!analysis) return analysis;
+    let text = analysis;
+    const name = candidate.full_name;
+    if (name && name.trim()) {
+      const parts = name.trim().split(/\s+/).filter(p => p.length > 2);
+      [name, ...parts].forEach(term => {
+        text = text.replace(new RegExp(term, 'gi'), 'This candidate');
+      });
+    }
+    // Replace gendered/singular pronouns, fixing verb agreement too
+    text = text.replace(/\b(He|She) is\b/g, 'They are');
+    text = text.replace(/\b(he|she) is\b/g, 'they are');
+    text = text.replace(/\b(He|She) was\b/g, 'They were');
+    text = text.replace(/\b(he|she) was\b/g, 'they were');
+    text = text.replace(/\b(He|She) has\b/g, 'They have');
+    text = text.replace(/\b(he|she) has\b/g, 'they have');
+    text = text.replace(/\b(He|She) does\b/g, 'They do');
+    text = text.replace(/\b(he|she) does\b/g, 'they do');
+    text = text.replace(/\bHis\b/g, 'Their');
+    text = text.replace(/\bHer\b/g, 'Their');
+    text = text.replace(/\bhis\b/g, 'their');
+    text = text.replace(/\bher\b/g, 'their');
+    text = text.replace(/\bHe\b/g, 'They');
+    text = text.replace(/\bShe\b/g, 'They');
+    text = text.replace(/\bhe\b/g, 'they');
+    text = text.replace(/\bshe\b/g, 'they');
+    text = text.replace(/\bHim\b/g, 'Them');
+    text = text.replace(/\bhim\b/g, 'them');
+    return text.replace(/^This candidate\s+this candidate/i, 'This candidate');
+  };
+
   const getScoreColor = (score) => {
     if (score >= 70) return '#34d399';
     if (score >= 40) return '#fbbf24';
@@ -109,6 +153,31 @@ const MatchResults = () => {
 
   const renderCard = (r, rank) => {
     const status = r.application_status;
+
+    if (r.processing) {
+      return (
+        <div className="result-card result-card--processing" key={r.candidate.id}>
+          <div className="rc-rank" style={{ color: '#7880a0' }}>#{rank}</div>
+          <div className="rc-info">
+            <div className="rc-name-row">
+              <span className="rc-name">{r.candidate.full_name || 'Unknown'}</span>
+              <span className={`status-badge ${status}`}>{STATUS_LABELS[status] || status}</span>
+            </div>
+            <div className="rc-email">{r.candidate.email || '—'}</div>
+          </div>
+          <div className="rc-score-col">
+            <div className="processing-label">Calculating...</div>
+          </div>
+          <div className="rc-detail-col" />
+          <div className="rc-actions">
+            {r.candidate.cv_filename && (
+              <button className="act-sm act-cv" onClick={() => downloadCV(r.candidate.id, r.candidate.cv_filename)}>↓ CV</button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     const expL = matchLabel(r.experience_match);
     const eduL = matchLabel(r.education_match);
 
@@ -149,7 +218,7 @@ const MatchResults = () => {
               <p
                 className="rc-analysis"
                 style={expandedAnalysis[r.candidate.id] ? { WebkitLineClamp: 'unset', lineClamp: 'unset' } : {}}
-              >{r.analysis}</p>
+              >{anonymizeAnalysis(r.analysis, r.candidate)}</p>
               <button
                 className="rc-expand-btn"
                 onClick={() => setExpandedAnalysis(prev => ({ ...prev, [r.candidate.id]: !prev[r.candidate.id] }))}
@@ -158,14 +227,14 @@ const MatchResults = () => {
           )}
           {(r.matched_skills || []).length > 0 && (
             <div className="rc-chip-row">
-              {r.matched_skills.slice(0, 3).map(s => (
+              {r.matched_skills.map(s => (
                 <span key={s} className="skill-match-tag matched">{s}</span>
               ))}
             </div>
           )}
           {(r.missing_skills || []).length > 0 && (
             <div className="rc-chip-row">
-              {r.missing_skills.slice(0, 2).map(s => (
+              {r.missing_skills.map(s => (
                 <span key={s} className="skill-match-tag missing">{s}</span>
               ))}
             </div>

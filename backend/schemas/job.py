@@ -11,6 +11,11 @@ class JobCreate(BaseModel):
     deadline: Optional[datetime] = None
 
 class JobUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    required_skills: Optional[List[str]] = None
+    required_experience_years: Optional[int] = None
+    required_education: Optional[str] = None
     deadline: Optional[datetime] = None
 
 class JobOut(JobCreate):

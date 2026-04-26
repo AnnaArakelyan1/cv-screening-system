@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import StreamingResponse
-from database import SessionLocal
 import io
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -19,29 +18,20 @@ from models.job_report import JobReport
 from schemas.job import JobCreate, JobUpdate, JobOut
 from datetime import datetime, timezone
 from utils.auth import get_current_user
-from utils.matcher import get_embedding, match_cv_with_gemini
-from utils.cv_parser import parse_cv_fast, is_likely_cv, build_embedding_text, _gemini_parse
+from utils.matcher import get_embedding
+from utils.tasks import enrich_and_match, is_in_progress
+from utils.cv_parser import parse_cv_fast, is_likely_cv
 from utils.email_sender import send_email
 from typing import List
 from pathlib import Path
 import logging
 import uuid
-import time
 
 UPLOAD_DIR = Path("/app/uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 router = APIRouter()
 
-def _save_embedding(candidate_id: int, text: str):
-    db = SessionLocal()
-    try:
-        candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
-        if candidate:
-            candidate.embedding = get_embedding(text)
-            db.commit()
-    finally:
-        db.close()
 
 @router.post("/", response_model=JobOut)
 def create_job(
@@ -72,9 +62,11 @@ def get_jobs(
         db.commit()
     return jobs
 
+
 @router.get("/{job_id}/match")
 def match_candidates(
     job_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -85,114 +77,87 @@ def match_candidates(
     applications = db.query(Application).filter(Application.job_id == job_id).all()
     applied_candidate_ids = {app.candidate_id: app.status for app in applications}
 
+    existing_matches = db.query(MatchResult).filter(
+        MatchResult.job_id == job_id,
+        MatchResult.candidate_id.in_(list(applied_candidate_ids.keys()))
+    ).all()
+
+    FAILED = {"Analysis unavailable", "Analysis unavailable."}
+
+    # ready: has a valid analysis result
+    cached_map = {mr.candidate_id: mr for mr in existing_matches
+                  if mr.analysis and mr.analysis not in FAILED}
+    # has any MR at all
+    has_mr = {mr.candidate_id for mr in existing_matches}
+
+    # reset permanently-failed analyses so they can be retried
+    needs_commit = False
+    for mr in existing_matches:
+        if mr.analysis in FAILED:
+            mr.analysis = None
+            needs_commit = True
+    if needs_commit:
+        db.commit()
+
     candidates = db.query(Candidate).filter(
         Candidate.id.in_(list(applied_candidate_ids.keys()))
     ).all()
+    candidate_map = {c.id: c for c in candidates}
+
     results = []
+    for cid, status in applied_candidate_ids.items():
+        c = candidate_map.get(cid)
+        if not c:
+            continue
 
-    for candidate in candidates:
-        is_applied = True
-
-        existing = db.query(MatchResult).filter(
-            MatchResult.candidate_id == candidate.id,
-            MatchResult.job_id == job_id
-        ).first()
-
-        if existing and existing.analysis is not None:
-            gemini_score = existing.match_score
-            matched_skills = existing.matched_skills or []
-            missing_skills = existing.missing_skills or []
-            experience_match = existing.experience_match or "unknown"
-            education_match = existing.education_match or "unknown"
-            analysis = existing.analysis
+        if cid in cached_map:
+            mr = cached_map[cid]
+            results.append({
+                "candidate": {
+                    "id": cid, "full_name": c.full_name, "email": c.email,
+                    "phone": c.phone, "skills": c.skills, "cluster_id": c.cluster_id,
+                    "uploaded_at": c.uploaded_at.isoformat(), "cv_filename": c.cv_filename,
+                },
+                "match_score": mr.match_score,
+                "matched_skills": mr.matched_skills or [],
+                "missing_skills": mr.missing_skills or [],
+                "experience_match": mr.experience_match or "unknown",
+                "education_match": mr.education_match or "unknown",
+                "analysis": mr.analysis,
+                "applied": True,
+                "application_status": status,
+                "processing": False,
+            })
         else:
-            # Re-parse with Gemini if experience or education is missing
-            needs_reparse = (
-                (not candidate.experience or not candidate.education) and
-                candidate.raw_text
-            )
-            if needs_reparse:
-                parsed = _gemini_parse(candidate.raw_text)
-                if parsed.get("full_name"):
-                    candidate.full_name = parsed["full_name"]
-                if parsed.get("skills"):
-                    candidate.skills = parsed["skills"]
-                if parsed.get("experience"):
-                    candidate.experience = parsed["experience"]
-                if parsed.get("education"):
-                    candidate.education = parsed["education"]
-                db.commit()
-                time.sleep(5)  # 1 req used — wait before next call
+            # Use in-memory set to know if a task is truly running right now.
+            # After a server restart the set is empty, so any analysis=None in DB
+            # (orphaned from killed tasks) will be re-triggered correctly.
+            if not is_in_progress(cid, job_id):
+                if cid not in has_mr:
+                    db.add(MatchResult(candidate_id=cid, job_id=job_id, match_score=None,
+                                       matched_skills=[], missing_skills=[]))
+                    db.commit()
+                background_tasks.add_task(enrich_and_match, cid, c.raw_text or "", job_id)
 
-            cv_data = {
-                "skills": candidate.skills or [],
-                "experience": candidate.experience,
-                "education": candidate.education,
-                "raw_text": candidate.raw_text,
-            }
-            gemini = match_cv_with_gemini(
-                cv_data=cv_data,
-                job_title=job.title,
-                job_description=job.description,
-                required_skills=job.required_skills or [],
-                required_experience_years=job.required_experience_years or 0,
-                required_education=job.required_education or "",
-            )
-            time.sleep(5)  # proactive spacing between Gemini calls
-            gemini_score = gemini["score"]
-            matched_skills = gemini["matched_skills"]
-            missing_skills = gemini["missing_skills"]
-            experience_match = gemini["experience_match"]
-            education_match = gemini["education_match"]
-            analysis = gemini["summary"]
+            results.append({
+                "candidate": {
+                    "id": cid, "full_name": c.full_name, "email": c.email,
+                    "phone": c.phone, "skills": c.skills, "cluster_id": c.cluster_id,
+                    "uploaded_at": c.uploaded_at.isoformat(), "cv_filename": c.cv_filename,
+                },
+                "match_score": None,
+                "matched_skills": [],
+                "missing_skills": [],
+                "experience_match": "unknown",
+                "education_match": "unknown",
+                "analysis": None,
+                "applied": True,
+                "application_status": status,
+                "processing": True,
+            })
 
-            if existing:
-                existing.match_score = gemini_score
-                existing.matched_skills = matched_skills
-                existing.missing_skills = missing_skills
-                existing.experience_match = experience_match
-                existing.education_match = education_match
-                existing.analysis = analysis
-            else:
-                db.add(MatchResult(
-                    candidate_id=candidate.id,
-                    job_id=job_id,
-                    match_score=gemini_score,
-                    matched_skills=matched_skills,
-                    missing_skills=missing_skills,
-                    experience_match=experience_match,
-                    education_match=education_match,
-                    analysis=analysis,
-                ))
-            db.commit()
-
-        results.append({
-            "candidate": {
-                "id": candidate.id,
-                "full_name": candidate.full_name,
-                "email": candidate.email,
-                "phone": candidate.phone,
-                "skills": candidate.skills,
-                "cluster_id": candidate.cluster_id,
-                "uploaded_at": candidate.uploaded_at.isoformat(),
-                "cv_filename": candidate.cv_filename,
-            },
-            "match_score": gemini_score,
-            "matched_skills": matched_skills,
-            "missing_skills": missing_skills,
-            "experience_match": experience_match,
-            "education_match": education_match,
-            "analysis": analysis,
-            "applied": is_applied,
-            "application_status": applied_candidate_ids.get(candidate.id, None)
-        })
-
-    results.sort(key=lambda x: -x["match_score"])
-
-    return {
-        "results": results,
-        "emails_sent": 0
-    }
+    results.sort(key=lambda x: -(x["match_score"] or -1))
+    return {"results": results, "emails_sent": 0}
 
 @router.get("/{job_id}/public")
 def get_job_public(job_id: int, db: Session = Depends(get_db)):
@@ -235,11 +200,12 @@ async def public_apply(
     file_bytes = await file.read()
     parsed = parse_cv_fast(file_bytes, file.filename)
 
-    if not is_likely_cv(parsed):
+    cv_valid, gemini_name = is_likely_cv(parsed)
+    if not cv_valid:
         raise HTTPException(status_code=400, detail="The uploaded file does not appear to be a CV")
 
     resolved_email = email or parsed.get("email")
-    resolved_name = full_name or parsed.get("full_name")
+    resolved_name = full_name or gemini_name or parsed.get("full_name")
 
     candidate = None
     if resolved_email:
@@ -274,7 +240,7 @@ async def public_apply(
         db.add(candidate)
         db.commit()
         db.refresh(candidate)
-        background_tasks.add_task(_save_embedding, candidate.id, build_embedding_text(parsed))
+        background_tasks.add_task(enrich_and_match, candidate.id, parsed["raw_text"], job_id)
 
     application = Application(candidate_id=candidate.id, job_id=job_id)
     db.add(application)
@@ -622,10 +588,17 @@ def update_job(
         raise HTTPException(status_code=404, detail="Job not found")
     if not current_user.is_admin and job.created_by != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorised")
-    if data.deadline is not None:
-        job.deadline = data.deadline
-    else:
-        job.deadline = None
+    if data.title is not None:
+        job.title = data.title
+    if data.description is not None:
+        job.description = data.description
+    if data.required_skills is not None:
+        job.required_skills = data.required_skills
+    if data.required_experience_years is not None:
+        job.required_experience_years = data.required_experience_years
+    if data.required_education is not None:
+        job.required_education = data.required_education
+    job.deadline = data.deadline
     db.commit()
     db.refresh(job)
     return job

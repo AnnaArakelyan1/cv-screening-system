@@ -2,20 +2,31 @@ import re
 import json
 import logging
 import numpy as np
-from google import genai
+from groq import Groq
 from sentence_transformers import SentenceTransformer
 from config import settings
 
 logger = logging.getLogger(__name__)
 
-_gemini_client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+def _groq_generate(prompt: str) -> str:
+    client = Groq(api_key=settings.GROQ_API_KEY)
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0,
+    )
+    return response.choices[0].message.content.strip()
 
+import threading
 _model = None
+_model_lock = threading.Lock()
 
 def get_model():
     global _model
     if _model is None:
-        _model = SentenceTransformer("paraphrase-multilingual-mpnet-base-v2")
+        with _model_lock:
+            if _model is None:
+                _model = SentenceTransformer("paraphrase-multilingual-mpnet-base-v2")
     return _model
 
 
@@ -209,14 +220,20 @@ Education: {candidate_education}"""
 Return this exact structure:
 {{
   "score": <integer 0-100>,
-  "matched_skills": ["skills the candidate has that match job requirements"],
+  "matched_skills": ["only skills that appear in BOTH the candidate profile AND the required skills list"],
   "missing_skills": ["important required skills the candidate lacks"],
   "experience_match": "exceeds" | "meets" | "below" | "unknown",
   "education_match": "exceeds" | "meets" | "below" | "unknown",
-  "summary": "2-3 sentence honest assessment of this candidate for this role"
+  "summary": "2-3 sentence honest assessment of this candidate for this role, written in English, no repeated sentences"
 }}
 
-Scoring guide: 70-100 = strong match, 40-69 = moderate, 0-39 = weak.
+Scoring guide (be strict):
+- 80-100: candidate has most or all required skills, sufficient experience, meets education
+- 60-79: candidate has more than half the required skills with relevant experience
+- 40-59: candidate has some relevant skills but is missing several key requirements
+- 20-39: candidate has few required skills, significant gaps in experience or domain
+- 0-19: candidate is clearly unqualified for this role
+Missing core required skills must heavily penalize the score. Do not inflate scores based on general programming knowledge alone.
 
 JOB POSTING:
 Title: {job_title}
@@ -232,12 +249,7 @@ CANDIDATE PROFILE:
     last_err = None
     for attempt in range(5):
         try:
-            response = _gemini_client.models.generate_content(
-                model="gemini-2.5-flash-lite",
-                contents=prompt,
-                config={"temperature": 0},
-            )
-            text = response.text.strip()
+            text = _groq_generate(prompt)
             text = re.sub(r'^```(?:json)?\s*', '', text)
             text = re.sub(r'\s*```$', '', text)
             data = json.loads(text)
@@ -265,5 +277,113 @@ CANDIDATE PROFILE:
         "missing_skills": [],
         "experience_match": "unknown",
         "education_match": "unknown",
+        "summary": "Analysis unavailable.",
+    }
+
+
+def parse_and_match(
+    raw_text: str,
+    job_title: str,
+    job_description: str,
+    required_skills: list,
+    required_experience_years: int = 0,
+    required_education: str = None,
+) -> dict:
+    """Single Gemini call: parse CV + score match. Returns combined result."""
+    req_skills_str = ", ".join(required_skills) if required_skills else "not specified"
+    req_exp = f"{required_experience_years} years" if required_experience_years else "not specified"
+    req_edu = required_education or "not specified"
+
+    prompt = f"""You are a CV parser and HR recruiter. Given this CV and job posting, extract CV info AND score the match in a single response.
+
+Return ONLY valid JSON, no markdown, no explanation:
+{{
+  "full_name": "candidate's personal given+family name (may be in Armenian, Russian, or any language) — NOT section headings like 'Biographical Data' or 'Personal Information' — or null if not found",
+  "email": "email address or null",
+  "phone": "phone number or null",
+  "skills": ["list of technical skills the candidate has, preserve original casing"],
+  "education": "education background as a single string or null",
+  "experience": "work experience as a single string or null",
+  "match_score": <integer 0-100>,
+  "matched_skills": ["skills that appear in BOTH the required skills list AND are explicitly mentioned in the CV text — do NOT include a skill unless it is clearly written in the CV"],
+  "missing_skills": ["required skills that are NOT found anywhere in the CV text"],
+  "experience_match": "exceeds" | "meets" | "below" | "unknown",
+  "education_match": "exceeds" | "meets" | "below" | "unknown",
+  "summary": "2-3 sentence honest assessment of this candidate for this role, written in English, no repeated sentences"
+}}
+
+STRICT RULES for matched_skills and missing_skills:
+- A skill is matched ONLY if the exact skill or a clear synonym appears in the CV text
+- If a required skill is not written anywhere in the CV, it MUST go in missing_skills, not matched_skills
+- Do not infer or assume skills that are not stated
+- Python listed in CV + Python required = matched. Machine learning NOT in CV + machine learning required = missing.
+
+Scoring guide (be strict):
+- 80-100: candidate has most or all required skills, sufficient experience, meets education
+- 60-79: candidate has more than half the required skills with relevant experience
+- 40-59: candidate has some relevant skills but is missing several key requirements
+- 20-39: candidate has few required skills, significant gaps in experience or domain
+- 0-19: candidate is clearly unqualified for this role
+IMPORTANT: Score is based primarily on required skills coverage.
+- If the candidate is missing more than half the required skills, the score MUST be below 40.
+- If the candidate is missing ALL of the domain-specific required skills (e.g. all ML skills for an ML role), the score MUST be below 30, regardless of experience or education.
+- General programming knowledge (knowing Python alone) does NOT compensate for missing domain skills.
+- Do not inflate scores. A backend developer applying for an ML role with no ML skills should score 15-25.
+
+JOB POSTING:
+Title: {job_title}
+Description: {job_description}
+Required Skills: {req_skills_str}
+Required Experience: {req_exp}
+Required Education: {req_edu}
+
+CV TEXT:
+{raw_text[:7000]}"""
+
+    import time
+    last_err = None
+    for attempt in range(5):
+        try:
+            text = _groq_generate(prompt)
+            text = re.sub(r'^```(?:json)?\s*', '', text)
+            text = re.sub(r'\s*```$', '', text)
+            data = json.loads(text)
+            req_lower = {s.lower() for s in required_skills}
+            raw_matched = data.get("matched_skills") or []
+            raw_text_lower = raw_text.lower()
+            matched = [
+                s for s in raw_matched
+                if s.lower() in req_lower
+                and s.lower() in raw_text_lower
+            ]
+            return {
+                "full_name": data.get("full_name"),
+                "email": data.get("email"),
+                "phone": data.get("phone"),
+                "skills": data.get("skills") or [],
+                "education": data.get("education"),
+                "experience": data.get("experience"),
+                "match_score": max(0, min(100, int(data.get("match_score", 0)))),
+                "matched_skills": matched,
+                "missing_skills": data.get("missing_skills") or [],
+                "experience_match": data.get("experience_match", "unknown"),
+                "education_match": data.get("education_match", "unknown"),
+                "summary": data.get("summary", ""),
+            }
+        except Exception as e:
+            last_err = e
+            err_str = str(e)
+            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                wait = 5 * (attempt + 1)
+                logger.warning(f"Gemini rate limited during parse+match, retrying in {wait}s (attempt {attempt+1}/5)")
+                time.sleep(wait)
+            else:
+                break
+    logger.warning(f"Gemini parse+match failed: {last_err}")
+    return {
+        "full_name": None, "email": None, "phone": None,
+        "skills": [], "education": None, "experience": None,
+        "match_score": 0, "matched_skills": [], "missing_skills": [],
+        "experience_match": "unknown", "education_match": "unknown",
         "summary": "Analysis unavailable.",
     }

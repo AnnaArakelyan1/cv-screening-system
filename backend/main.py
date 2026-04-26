@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,6 +7,8 @@ from routers import auth, candidates, jobs, applications, email, users, stats
 from models.user import User
 from models.job_report import JobReport
 from utils.auth import hash_password
+
+logger = logging.getLogger(__name__)
 
 Base.metadata.create_all(bind=engine)
 
@@ -26,6 +29,16 @@ async def lifespan(app: FastAPI):
         pass
     finally:
         db.close()
+
+    # Preload the embedding model at startup so background tasks don't block
+    try:
+        from utils.matcher import get_model
+        logger.info("Preloading SentenceTransformer model...")
+        get_model()
+        logger.info("SentenceTransformer model ready.")
+    except Exception as e:
+        logger.warning(f"Model preload failed (will load on first use): {e}")
+
     yield
 
 app = FastAPI(title="CV Screening System", lifespan=lifespan)

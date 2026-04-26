@@ -98,8 +98,8 @@ skills
 Python, FastAPI, PostgreSQL
 """
 
-exp = extract_section(cv, EXPERIENCE_KEYWORDS, EDUCATION_KEYWORDS)
-edu = extract_section(cv, EDUCATION_KEYWORDS,  EXPERIENCE_KEYWORDS)
+exp = extract_section(cv, EXPERIENCE_KEYWORDS)
+edu = extract_section(cv, EDUCATION_KEYWORDS)
 
 check("Experience section found",
     exp, expected_contains=["TechCorp"])
@@ -126,8 +126,8 @@ Bachelor degree, Yerevan State University 2021.
 skills
 Python, FastAPI
 """
-hy_exp = extract_section(hy_cv, EXPERIENCE_KEYWORDS, EDUCATION_KEYWORDS)
-hy_edu = extract_section(hy_cv, EDUCATION_KEYWORDS,  EXPERIENCE_KEYWORDS)
+hy_exp = extract_section(hy_cv, EXPERIENCE_KEYWORDS)
+hy_edu = extract_section(hy_cv, EDUCATION_KEYWORDS)
 check("English 'education' header works in otherwise Armenian CV", hy_edu, expected_contains=["Bachelor"])
 check("Experience section content extracted",                       hy_exp, expected_contains=["TechCorp"])
 

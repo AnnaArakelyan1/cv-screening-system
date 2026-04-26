@@ -106,7 +106,7 @@
 }
 
 .job-form-box button[type="submit"]:hover:not(:disabled) { background: var(--primary-dark); }
-.job-form-box button[type="submit"]:disabled { background: rgba(255,255,255,0.12); cursor: not-allowed; color: var(--muted); }
+.job-form-box button[type="submit"]:disabled { background: rgba(0,0,0,0.08); cursor: not-allowed; color: var(--muted); }
 
 /* Table */
 .table-wrap {
@@ -144,7 +144,7 @@
 }
 
 .jobs-table tbody tr:last-child { border-bottom: none; }
-.jobs-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+.jobs-table tbody tr:hover { background: rgba(0,0,0,0.02); }
 
 .jobs-table td {
   padding: 0.85rem 1rem;
@@ -181,7 +181,7 @@
 
 .copy-btn {
   padding: 0.3rem 0.7rem;
-  background: rgba(255,255,255,0.07);
+  background: rgba(0,0,0,0.05);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 5px;
@@ -192,7 +192,7 @@
   white-space: nowrap;
 }
 
-.copy-btn:hover { background: rgba(255,255,255,0.12); }
+.copy-btn:hover { background: rgba(0,0,0,0.09); }
 
 .row-actions {
   display: flex;
@@ -440,7 +440,7 @@
 }
 
 .report-table tr:last-child td { border-bottom: none; }
-.report-table tr:hover td { background: rgba(255,255,255,0.02); }
+.report-table tr:hover td { background: rgba(0,0,0,0.02); }
 
 .report-td-muted { color: var(--muted); font-size: 0.8rem; }
 .report-td-score { font-weight: 700; color: var(--primary); }
@@ -457,7 +457,7 @@
 .report-status-badge.shortlisted{ background: rgba(96,165,250,0.15); color: #60a5fa; }
 .report-status-badge.rejected   { background: rgba(248,113,113,0.12); color: #f87171; }
 .report-status-badge.applied,
-.report-status-badge.reviewed   { background: rgba(255,255,255,0.07); color: var(--muted); }
+.report-status-badge.reviewed   { background: rgba(0,0,0,0.05); color: var(--muted); }
 
 .cancel-btn {
   padding: 0.6rem 1.25rem;
@@ -470,4 +470,4 @@
   font-weight: 500;
   transition: background 0.15s;
 }
-.cancel-btn:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+.cancel-btn:hover { background: rgba(0,0,0,0.05); color: var(--text); }

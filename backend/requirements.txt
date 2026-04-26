@@ -15,6 +15,6 @@ scikit-learn
 numpy
 deep-translator
 sentence-transformers
-google-genai
+groq
 reportlab
 watchfiles

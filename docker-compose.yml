@@ -33,7 +33,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       SECRET_KEY: ${SECRET_KEY}
-      TRANSFORMERS_CACHE: /app/model_cache 
+      HF_HOME: /app/model_cache
     volumes:
       - ./backend:/app
       - model_cache:/app/model_cache

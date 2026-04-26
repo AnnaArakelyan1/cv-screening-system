@@ -9,7 +9,7 @@ class MatchResult(Base):
     id = Column(Integer, primary_key=True, index=True)
     candidate_id = Column(Integer, ForeignKey("candidates.id", ondelete="CASCADE"))
     job_id = Column(Integer, ForeignKey("jobs.id", ondelete="CASCADE"))
-    match_score = Column(Float, nullable=False)
+    match_score = Column(Float, nullable=True)
     matched_skills = Column(ARRAY(String), nullable=True)
     missing_skills = Column(ARRAY(String), nullable=True)
     experience_match = Column(String, nullable=True)

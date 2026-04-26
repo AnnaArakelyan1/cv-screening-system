@@ -4,13 +4,20 @@ import re
 import json
 import logging
 import spacy
-from google import genai
+from groq import Groq
 from config import settings
 
 logger = logging.getLogger(__name__)
 nlp = spacy.load("en_core_web_sm")
 
-_gemini_client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+def _groq_generate(prompt: str) -> str:
+    client = Groq(api_key=settings.GROQ_API_KEY)
+    response = client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0,
+    )
+    return response.choices[0].message.content.strip()
 
 SKILLS_KEYWORDS = [
     # Languages
@@ -48,7 +55,7 @@ SKILLS_SECTION_KEYWORDS = [
 ]
 
 
-def is_likely_cv(parsed: dict) -> bool:
+def is_likely_cv_regex(parsed: dict) -> bool:
     signals = 0
     if parsed.get("email"):
         signals += 2
@@ -71,6 +78,51 @@ def is_likely_cv(parsed: dict) -> bool:
         if re.search(r'\b' + hint + r'\b', text):
             signals += 1
     return signals >= 4
+
+
+def _gemini_validate(raw_text: str) -> dict:
+    """Returns {"is_cv": bool, "full_name": str|None} in one Gemini call."""
+    prompt = (
+        "Analyze the following document and return ONLY valid JSON, no markdown.\n\n"
+        "Return exactly this structure:\n"
+        '{"is_cv": true, "full_name": "John Smith"}\n'
+        "or if name not found:\n"
+        '{"is_cv": true, "full_name": null}\n\n'
+        "Rules:\n"
+        "- is_cv must be true if this is a CV/resume, false otherwise\n"
+        "- full_name must be the person's real name, NOT section headings like "
+        "'Personal Information', 'Biographical Data', 'Կենսագրական Տվյալներ', etc.\n"
+        "- Names can be in ANY language (English, Armenian, Russian, etc.) — Armenian names are valid person names.\n"
+        "- If the document starts with a section heading in any language, skip it and look for the actual name.\n"
+        "- If you cannot find a real person name, set full_name to null\n\n"
+        "Valid name examples: John Smith, Narek Petrosyan, Armen Hovhannisyan, Anna Grigoryan, Անի Առաքելյան\n"
+        "DOCUMENT:\n"
+        + raw_text[:4000]
+    )
+    try:
+        text = _groq_generate(prompt)
+        text = re.sub(r'^```(?:json)?\s*', '', text)
+        text = re.sub(r'\s*```$', '', text)
+        data = json.loads(text)
+        name = data.get("full_name")
+        if isinstance(name, str) and name.strip().lower() in ("null", "none", "n/a", ""):
+            name = None
+        logger.info(f"_gemini_validate result: is_cv={data.get('is_cv')}, name={name!r}")
+        return {"is_cv": bool(data.get("is_cv")), "full_name": name}
+    except Exception as e:
+        logger.warning(f"_gemini_validate failed: {e}")
+        return {"is_cv": True, "full_name": None}  # fail open — background task will enrich later
+
+
+def is_likely_cv(parsed: dict) -> tuple:
+    """Returns (is_cv: bool, full_name: str|None)."""
+    if not is_likely_cv_regex(parsed):
+        return False, None
+    result = _gemini_validate(parsed.get("raw_text", ""))
+    name = result["full_name"]
+    if not name:
+        name = extract_name(parsed.get("raw_text", ""))
+    return result["is_cv"], name
 
 
 def detect_language(text: str) -> str:
@@ -106,7 +158,8 @@ def extract_skills(text: str):
     text_lower = text.lower()
 
     for skill in SKILLS_KEYWORDS:
-        if skill.lower() in text_lower:
+        pattern = r'(?<!\w)' + re.escape(skill.lower()) + r'(?!\w)'
+        if re.search(pattern, text_lower):
             found.add(skill)
 
     lines = text.split('\n')
@@ -133,8 +186,24 @@ def extract_skills(text: str):
                 if part and 1 < len(part) < 50 and re.search(r'[a-zA-Z]', part):
                     found.add(part)
 
-    return list(found)
+    # Deduplicate case-insensitively, preferring mixed-case over all-lowercase
+    deduped = {}
+    for skill in found:
+        key = skill.lower()
+        if key not in deduped or (skill != skill.lower() and deduped[key] == deduped[key].lower()):
+            deduped[key] = skill
+    return list(deduped.values())
 
+
+_NAME_BLACKLIST = {
+    # English section headers
+    "resume", "curriculum vitae", "cv", "profile", "summary", "objective",
+    "personal information", "personal details", "contact", "contact information",
+    "skills", "experience", "education", "references", "certifications", "projects",
+    # Armenian section headers
+    "կենսագրական տվյալներ", "անձնական տվյալներ", "կրթություն", "փորձ",
+    "հմտություններ", "կապ", "ծանոթություններ", "նախագծեր", "ամփոփում",
+}
 
 def extract_name(text: str, original_text: str = None):
     doc = nlp(text[:500])
@@ -143,15 +212,27 @@ def extract_name(text: str, original_text: str = None):
             return ent.text
 
     source = original_text or text
-    for line in source.split("\n"):
-        line = line.strip()
-        if line and len(line) > 2 and len(line) < 60:
-            if "@" not in line and not re.match(r'^[\d\s\+\-\(\)]+$', line):
-                return line
+    lines = [l.strip() for l in source.split("\n") if l.strip()]
+    for i, line in enumerate(lines):
+        if not (2 < len(line) < 60):
+            continue
+        if "@" in line or re.match(r'^[\d\s\+\-\(\)]+$', line):
+            continue
+        if line.lower() in _NAME_BLACKLIST:
+            continue
+        # Skip lines that look like "Label: value" (section field labels)
+        if re.search(r':\s*\S', line):
+            continue
+        # Skip lines where any of the next 3 lines look like label:value pairs —
+        # that pattern means this line is a section heading above a form, not a name
+        next_lines = lines[i + 1: i + 4]
+        if any(re.search(r':\s*\S', nl) for nl in next_lines):
+            continue
+        return line
     return None
 
 
-def extract_section(text: str, section_keywords: list, next_section_keywords: list) -> str:
+def extract_section(text: str, section_keywords: list) -> str:
     lines = text.split("\n")
     section_lines = []
     in_section = False
@@ -210,7 +291,8 @@ def _gemini_parse(raw_text: str) -> dict:
         "Rules:\n"
         "- Only include skills the candidate demonstrably has, not things they want to learn\n"
         "- If a field is not found use null\n"
-        "- The CV may be in English or Armenian - handle both\n\n"
+        "- The CV may be in English or Armenian - handle both\n"
+        "- Preserve the original casing of skill names (e.g. 'Python' not 'python', 'REST API' not 'rest api', '.NET' not '.net')\n\n"
         "CV TEXT:\n"
         + raw_text[:8000]
     )
@@ -219,12 +301,7 @@ def _gemini_parse(raw_text: str) -> dict:
     last_err = None
     for attempt in range(5):
         try:
-            response = _gemini_client.models.generate_content(
-                model="gemini-2.5-flash-lite",
-                contents=prompt,
-                config={"temperature": 0},
-            )
-            text = response.text.strip()
+            text = _groq_generate(prompt)
             text = re.sub(r'^```(?:json)?\s*', '', text)
             text = re.sub(r'\s*```$', '', text)
             data = json.loads(text)
@@ -240,7 +317,7 @@ def _gemini_parse(raw_text: str) -> dict:
             last_err = e
             err_str = str(e)
             if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
-                wait = 15 * (attempt + 1)
+                wait = 5 * (attempt + 1)
                 logger.warning(f"Gemini rate limited during CV parse, retrying in {wait}s (attempt {attempt+1}/5)")
                 time.sleep(wait)
             else:
@@ -261,12 +338,12 @@ def parse_cv_fast(file_bytes: bytes, filename: str) -> dict:
         raw_text = file_bytes.decode("utf-8", errors="ignore")
 
     return {
-        "full_name": extract_name(raw_text),
+        "full_name": None,
         "email": extract_email(raw_text),
         "phone": extract_phone(raw_text),
         "skills": extract_skills(raw_text),
-        "education": extract_section(raw_text, EDUCATION_KEYWORDS, EXPERIENCE_KEYWORDS),
-        "experience": extract_section(raw_text, EXPERIENCE_KEYWORDS, EDUCATION_KEYWORDS),
+        "education": extract_section(raw_text, EDUCATION_KEYWORDS),
+        "experience": extract_section(raw_text, EXPERIENCE_KEYWORDS),
         "raw_text": raw_text,
     }
 

@@ -10,7 +10,8 @@ from schemas.candidate import CandidateOut
 from utils.auth import get_current_user
 from utils.cv_parser import parse_cv_fast, is_likely_cv, build_embedding_text
 from utils.matcher import get_embedding, cluster_candidates
-from database import SessionLocal
+from utils.tasks import enrich_and_match
+from models.match_result import MatchResult
 from utils.email_sender import send_email
 from typing import List
 from pathlib import Path
@@ -22,15 +23,6 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 
 router = APIRouter()
 
-def _save_embedding(candidate_id: int, text: str):
-    db = SessionLocal()
-    try:
-        candidate = db.query(Candidate).filter(Candidate.id == candidate_id).first()
-        if candidate:
-            candidate.embedding = get_embedding(text)
-            db.commit()
-    finally:
-        db.close()
 
 @router.post("/upload", response_model=CandidateOut)
 async def upload_cv(
@@ -57,24 +49,27 @@ async def upload_cv(
     file_bytes = await file.read()
     parsed = parse_cv_fast(file_bytes, file.filename)
 
-    if not is_likely_cv(parsed):
+    cv_valid, gemini_name = is_likely_cv(parsed)
+    if not cv_valid:
         raise HTTPException(status_code=400, detail="The uploaded file does not appear to be a CV")
 
-    resolved_name  = full_name or parsed.get("full_name")
+    resolved_name  = full_name or gemini_name or parsed.get("full_name")
     resolved_email = email    or parsed.get("email")
 
     if resolved_email:
         existing = db.query(Candidate).filter(Candidate.email == resolved_email).first()
         if existing:
-            if full_name:
-                existing.full_name = full_name
             existing_app = db.query(Application).filter(
                 Application.candidate_id == existing.id,
                 Application.job_id == job_id
             ).first()
-            if not existing_app:
-                db.add(Application(candidate_id=existing.id, job_id=job_id))
+            if existing_app:
+                raise HTTPException(status_code=400, detail="This candidate has already applied to this job")
+            if full_name:
+                existing.full_name = full_name
+            db.add(Application(candidate_id=existing.id, job_id=job_id))
             db.commit()
+            background_tasks.add_task(enrich_and_match, existing.id, existing.raw_text or "", job_id)
             db.refresh(existing)
             return existing
 
@@ -97,7 +92,7 @@ async def upload_cv(
     db.add(candidate)
     db.commit()
     db.refresh(candidate)
-    background_tasks.add_task(_save_embedding, candidate.id, build_embedding_text(parsed))
+    background_tasks.add_task(enrich_and_match, candidate.id, parsed["raw_text"], job_id)
 
     db.add(Application(candidate_id=candidate.id, job_id=job_id))
     db.commit()
