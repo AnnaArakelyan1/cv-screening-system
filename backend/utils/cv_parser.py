@@ -124,13 +124,60 @@ def detect_language(text: str) -> str:
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
     doc = fitz.open(stream=file_bytes, filetype="pdf")
-    return "\n".join(page.get_text() for page in doc)
+    pages_text = []
+
+    for page in doc:
+        blocks = page.get_text("blocks")
+        # Keep only text blocks (type 0) with content
+        text_blocks = [b for b in blocks if b[6] == 0 and b[4].strip()]
+        if not text_blocks:
+            continue
+
+        page_width = page.rect.width
+        # Detect columns: check if blocks cluster on both left and right halves
+        left = [b for b in text_blocks if b[0] < page_width * 0.45]
+        right = [b for b in text_blocks if b[0] >= page_width * 0.45]
+        is_two_column = len(left) >= 2 and len(right) >= 2
+
+        if is_two_column:
+            left_sorted  = sorted(left,  key=lambda b: b[1])
+            right_sorted = sorted(right, key=lambda b: b[1])
+            ordered = left_sorted + right_sorted
+        else:
+            ordered = sorted(text_blocks, key=lambda b: (b[1], b[0]))
+
+        pages_text.append("\n".join(b[4].strip() for b in ordered))
+
+    return "\n\n".join(pages_text)
 
 
 def extract_text_from_docx(file_bytes: bytes) -> str:
     import io
+    from docx.oxml.ns import qn
+
     doc = docx.Document(io.BytesIO(file_bytes))
-    return "\n".join(para.text for para in doc.paragraphs)
+    parts = []
+
+    for element in doc.element.body:
+        tag = element.tag.split('}')[-1] if '}' in element.tag else element.tag
+
+        if tag == 'p':
+            text = ''.join(node.text or '' for node in element.iter() if node.tag.endswith('}t'))
+            if text.strip():
+                parts.append(text.strip())
+        elif tag == 'tbl':
+            for row in element.iter(qn('w:tr')):
+                cells = []
+                for cell in row.iter(qn('w:tc')):
+                    cell_text = ''.join(
+                        node.text or '' for node in cell.iter() if node.tag.endswith('}t')
+                    )
+                    if cell_text.strip():
+                        cells.append(cell_text.strip())
+                if cells:
+                    parts.append(' | '.join(cells))
+
+    return '\n'.join(parts)
 
 
 def extract_email(text: str):
