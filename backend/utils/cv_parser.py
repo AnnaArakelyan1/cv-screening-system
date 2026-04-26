@@ -4,20 +4,10 @@ import re
 import json
 import logging
 import spacy
-from groq import Groq
-from config import settings
+from utils.llm import generate as llm_generate
 
 logger = logging.getLogger(__name__)
 nlp = spacy.load("en_core_web_sm")
-
-def _groq_generate(prompt: str) -> str:
-    client = Groq(api_key=settings.GROQ_API_KEY)
-    response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0,
-    )
-    return response.choices[0].message.content.strip()
 
 SKILLS_KEYWORDS = [
     # Languages
@@ -100,7 +90,7 @@ def _gemini_validate(raw_text: str) -> dict:
         + raw_text[:4000]
     )
     try:
-        text = _groq_generate(prompt)
+        text = llm_generate(prompt, fast=True)
         text = re.sub(r'^```(?:json)?\s*', '', text)
         text = re.sub(r'\s*```$', '', text)
         data = json.loads(text)
@@ -301,7 +291,7 @@ def _gemini_parse(raw_text: str) -> dict:
     last_err = None
     for attempt in range(5):
         try:
-            text = _groq_generate(prompt)
+            text = llm_generate(prompt, fast=True)
             text = re.sub(r'^```(?:json)?\s*', '', text)
             text = re.sub(r'\s*```$', '', text)
             data = json.loads(text)

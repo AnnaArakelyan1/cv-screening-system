@@ -2,20 +2,10 @@ import re
 import json
 import logging
 import numpy as np
-from groq import Groq
 from sentence_transformers import SentenceTransformer
-from config import settings
+from utils.llm import generate as llm_generate
 
 logger = logging.getLogger(__name__)
-
-def _groq_generate(prompt: str) -> str:
-    client = Groq(api_key=settings.GROQ_API_KEY)
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0,
-    )
-    return response.choices[0].message.content.strip()
 
 import threading
 _model = None
@@ -249,7 +239,7 @@ CANDIDATE PROFILE:
     last_err = None
     for attempt in range(5):
         try:
-            text = _groq_generate(prompt)
+            text = llm_generate(prompt)
             text = re.sub(r'^```(?:json)?\s*', '', text)
             text = re.sub(r'\s*```$', '', text)
             data = json.loads(text)
@@ -344,7 +334,7 @@ CV TEXT:
     last_err = None
     for attempt in range(5):
         try:
-            text = _groq_generate(prompt)
+            text = llm_generate(prompt)
             text = re.sub(r'^```(?:json)?\s*', '', text)
             text = re.sub(r'\s*```$', '', text)
             data = json.loads(text)

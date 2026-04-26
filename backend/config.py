@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     MAIL_PASSWORD: str = ""
     GOOGLE_API_KEY: str = ""
     GROQ_API_KEY: str = ""
+    OPENAI_API_KEY: str = ""
+    ANTHROPIC_API_KEY: str = ""
+    LLM_PROVIDER: str = "groq"
+    LLM_MODEL: str = ""
 
     class Config:
         env_file = ".env"
