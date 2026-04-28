@@ -7,6 +7,16 @@ from reportlab.lib.units import mm
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+def _register_fonts():
+    try:
+        pdfmetrics.registerFont(TTFont('DejaVu', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'))
+        pdfmetrics.registerFont(TTFont('DejaVu-Bold', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'))
+        return 'DejaVu', 'DejaVu-Bold', 'DejaVu'
+    except Exception:
+        return 'Helvetica', 'Helvetica-Bold', 'Helvetica-Oblique'
 from sqlalchemy.orm import Session
 from database import get_db
 from models.job import Job
@@ -404,12 +414,14 @@ def download_job_report_pdf(
 
     from datetime import datetime as dt
 
-    title_style   = ParagraphStyle('t',  fontSize=18, fontName='Helvetica-Bold', textColor=colors.HexColor('#1e1b4b'), spaceAfter=4)
-    sub_style     = ParagraphStyle('s',  fontSize=9,  fontName='Helvetica',      textColor=colors.HexColor('#6b7280'), spaceAfter=12)
-    heading_style = ParagraphStyle('h',  fontSize=10, fontName='Helvetica-Bold', textColor=colors.HexColor('#374151'), spaceBefore=14, spaceAfter=6)
-    body_style    = ParagraphStyle('b',  fontSize=9,  fontName='Helvetica',      textColor=colors.HexColor('#374151'), spaceAfter=3)
-    muted_style   = ParagraphStyle('m',  fontSize=8,  fontName='Helvetica',      textColor=colors.HexColor('#9ca3af'), spaceAfter=2)
-    italic_style  = ParagraphStyle('i',  fontSize=8,  fontName='Helvetica-Oblique', textColor=colors.HexColor('#6b7280'), spaceAfter=6)
+    font_normal, font_bold, font_italic = _register_fonts()
+
+    title_style   = ParagraphStyle('t',  fontSize=18, fontName=font_bold,   textColor=colors.HexColor('#1e1b4b'), spaceAfter=4)
+    sub_style     = ParagraphStyle('s',  fontSize=9,  fontName=font_normal, textColor=colors.HexColor('#6b7280'), spaceAfter=12)
+    heading_style = ParagraphStyle('h',  fontSize=10, fontName=font_bold,   textColor=colors.HexColor('#374151'), spaceBefore=14, spaceAfter=6)
+    body_style    = ParagraphStyle('b',  fontSize=9,  fontName=font_normal, textColor=colors.HexColor('#374151'), spaceAfter=3)
+    muted_style   = ParagraphStyle('m',  fontSize=8,  fontName=font_normal, textColor=colors.HexColor('#9ca3af'), spaceAfter=2)
+    italic_style  = ParagraphStyle('i',  fontSize=8,  fontName=font_italic, textColor=colors.HexColor('#6b7280'), spaceAfter=6)
 
     def section_header(text):
         story.append(Spacer(1, 4))
@@ -447,8 +459,8 @@ def download_job_report_pdf(
     st.setStyle(TableStyle([
         ('BACKGROUND',   (0,0),(-1,0), colors.HexColor('#f3f4f6')),
         ('TEXTCOLOR',    (0,0),(-1,0), colors.HexColor('#6b7280')),
-        ('FONTNAME',     (0,0),(-1,0), 'Helvetica'), ('FONTSIZE',(0,0),(-1,0), 7.5),
-        ('FONTNAME',     (0,1),(-1,1), 'Helvetica-Bold'), ('FONTSIZE',(0,1),(-1,1), 15),
+        ('FONTNAME',     (0,0),(-1,0), font_normal), ('FONTSIZE',(0,0),(-1,0), 7.5),
+        ('FONTNAME',     (0,1),(-1,1), font_bold), ('FONTSIZE',(0,1),(-1,1), 15),
         ('TEXTCOLOR',    (0,1),(-1,1), colors.HexColor('#1e1b4b')),
         ('ALIGN',        (0,0),(-1,-1), 'CENTER'), ('VALIGN',(0,0),(-1,-1),'MIDDLE'),
         ('BOX',          (0,0),(-1,-1), 0.5, colors.HexColor('#e5e7eb')),
@@ -468,8 +480,8 @@ def download_job_report_pdf(
         dt2.setStyle(TableStyle([
             ('BACKGROUND',  (0,0),(-1,0), colors.HexColor('#f9fafb')),
             ('TEXTCOLOR',   (0,0),(-1,0), colors.HexColor('#6b7280')),
-            ('FONTNAME',    (0,0),(-1,0), 'Helvetica'), ('FONTSIZE',(0,0),(-1,0), 8),
-            ('FONTNAME',    (0,1),(-1,1), 'Helvetica-Bold'), ('FONTSIZE',(0,1),(-1,1), 13),
+            ('FONTNAME',    (0,0),(-1,0), font_normal), ('FONTSIZE',(0,0),(-1,0), 8),
+            ('FONTNAME',    (0,1),(-1,1), font_bold), ('FONTSIZE',(0,1),(-1,1), 13),
             ('TEXTCOLOR',   (0,1),(0,1),  colors.HexColor('#16a34a')),
             ('TEXTCOLOR',   (1,1),(1,1),  colors.HexColor('#2563eb')),
             ('TEXTCOLOR',   (2,1),(2,1),  colors.HexColor('#d97706')),
@@ -502,7 +514,7 @@ def download_job_report_pdf(
         score_str = f"{c['score']}%" if c.get('score') is not None else '—'
         name_row = Table(
             [[Paragraph(f"<b>{c.get('name','Unknown')}</b>", body_style),
-              Paragraph(score_str, ParagraphStyle('sc', fontSize=13, fontName='Helvetica-Bold',
+              Paragraph(score_str, ParagraphStyle('sc', fontSize=13, fontName=font_bold,
                         textColor=colors.HexColor('#7c3aed'), alignment=TA_CENTER))]],
             colWidths=[148*mm, 22*mm]
         )
@@ -553,9 +565,9 @@ def download_job_report_pdf(
         tbl = Table(rows, colWidths=[8*mm, 42*mm, 52*mm, 14*mm, 20*mm, 10*mm, 10*mm])
         tbl_style = [
             ('BACKGROUND',   (0,0),(-1,0), colors.HexColor('#f3f4f6')),
-            ('FONTNAME',     (0,0),(-1,0), 'Helvetica-Bold'),
+            ('FONTNAME',     (0,0),(-1,0), font_bold),
             ('FONTSIZE',     (0,0),(-1,-1), 7.5),
-            ('FONTNAME',     (0,1),(-1,-1), 'Helvetica'),
+            ('FONTNAME',     (0,1),(-1,-1), font_normal),
             ('TEXTCOLOR',    (0,0),(-1,0), colors.HexColor('#374151')),
             ('TEXTCOLOR',    (0,1),(-1,-1), colors.HexColor('#374151')),
             ('ALIGN',        (0,0),(-1,-1), 'LEFT'),
