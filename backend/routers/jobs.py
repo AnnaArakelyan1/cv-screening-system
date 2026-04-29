@@ -28,6 +28,7 @@ from models.job_report import JobReport
 from schemas.job import JobCreate, JobUpdate, JobOut
 from datetime import datetime, timezone
 from utils.auth import get_current_user
+from utils.audit import log_action
 from utils.matcher import get_embedding
 from utils.tasks import enrich_and_match, is_in_progress
 from utils.cv_parser import parse_cv_fast, is_likely_cv
@@ -54,6 +55,7 @@ def create_job(
     db.add(job)
     db.commit()
     db.refresh(job)
+    log_action(db, current_user, "job_created", {"job_id": job.id, "title": job.title})
     return job
 
 @router.get("/", response_model=List[JobOut])
@@ -208,6 +210,17 @@ async def public_apply(
         raise HTTPException(status_code=400, detail="Only PDF and DOCX files are supported")
 
     file_bytes = await file.read()
+
+    if len(file_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB")
+
+    is_pdf  = file_bytes[:4] == b'%PDF'
+    is_docx = file_bytes[:4] == b'PK\x03\x04'
+    if file.filename.endswith(".pdf") and not is_pdf:
+        raise HTTPException(status_code=400, detail="File is not a valid PDF")
+    if file.filename.endswith(".docx") and not is_docx:
+        raise HTTPException(status_code=400, detail="File is not a valid DOCX")
+
     parsed = parse_cv_fast(file_bytes, file.filename)
 
     cv_valid, gemini_name = is_likely_cv(parsed)
@@ -371,6 +384,11 @@ def toggle_job(
         raise HTTPException(status_code=403, detail="Not authorised")
     job.is_open = not job.is_open
     db.commit()
+    log_action(db, current_user, "job_toggled", {
+        "job_id": job_id,
+        "title": job.title,
+        "is_open": job.is_open,
+    })
 
     if not job.is_open:
         report_data = _generate_report(job, db)
@@ -626,6 +644,7 @@ def delete_job(
         raise HTTPException(status_code=404, detail="Job not found")
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Only admins can delete job postings")
+    log_action(db, current_user, "job_deleted", {"job_id": job_id, "title": job.title})
     db.delete(job)
     db.commit()
     return {"message": "Job deleted successfully"}

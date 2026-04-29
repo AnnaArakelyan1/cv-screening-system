@@ -76,14 +76,12 @@ def extract_years_of_experience(text: str) -> int:
     current_year = datetime.now().year
     text_lower = text.lower()
 
-    # Words meaning "present" across languages/styles
     PRESENT_WORDS = {
         "present", "current", "now", "ongoing", "till date", "to date",
         "ներկա", "մինչ օրս", "առ այսօր",
     }
     present_pattern = "|".join(re.escape(w) for w in PRESENT_WORDS)
 
-    # Pattern 1: date ranges  2021–2024 / 2021 - present / 2021–ներկա
     ranges = re.findall(
         rf"\b(20\d{{2}})\s*[-–/]\s*(20\d{{2}}|{present_pattern})\b",
         text_lower
@@ -106,7 +104,6 @@ def extract_years_of_experience(text: str) -> int:
     if explicit:
         return max(int(m) for m in explicit)
 
-    # Pattern 3: earliest year mentioned → rough estimate
     years_found = re.findall(r"\b(20\d{2})\b", text)
     if years_found:
         earliest = min(int(y) for y in years_found)
@@ -328,7 +325,7 @@ Required Experience: {req_exp}
 Required Education: {req_edu}
 
 CV TEXT:
-{raw_text[:7000]}"""
+{raw_text[:12000]}"""
 
     import time
     last_err = None

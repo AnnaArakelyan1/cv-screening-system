@@ -9,6 +9,7 @@ from models.match_result import MatchResult
 from schemas.application import ApplicationCreate, ApplicationOut
 from utils.auth import get_current_user
 from utils.email_sender import send_email
+from utils.audit import log_action
 from typing import List
 import threading
 
@@ -131,6 +132,13 @@ def update_status(
 
     application.status = status
     db.commit()
+    log_action(db, current_user, "status_changed", {
+        "application_id": application_id,
+        "candidate_id": application.candidate_id,
+        "job_id": application.job_id,
+        "old_status": old_status,
+        "new_status": status,
+    })
 
     if status in ("shortlisted", "accepted", "rejected"):
         candidate = db.query(Candidate).filter(Candidate.id == application.candidate_id).first()

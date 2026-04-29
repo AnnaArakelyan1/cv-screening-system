@@ -6,6 +6,7 @@ from database import get_db
 from models.user import User
 from schemas.user import UserOut
 from utils.auth import get_current_user, hash_password, verify_password
+from routers.auth import validate_password
 
 router = APIRouter()
 
@@ -37,8 +38,7 @@ def update_me(
             raise HTTPException(status_code=400, detail="Current password is required")
         if not verify_password(data.current_password, current_user.hashed_password):
             raise HTTPException(status_code=400, detail="Current password is incorrect")
-        if len(data.new_password) < 6:
-            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        validate_password(data.new_password)
         current_user.hashed_password = hash_password(data.new_password)
 
     db.commit()
@@ -57,8 +57,7 @@ def set_password(
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    if len(data.new_password) < 6:
-        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    validate_password(data.new_password)
     user.hashed_password = hash_password(data.new_password)
     db.commit()
     return {"message": f"Password updated for {user.email}"}

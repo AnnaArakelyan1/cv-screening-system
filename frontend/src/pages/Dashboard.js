@@ -57,6 +57,7 @@ const Dashboard = () => {
           API.get('/jobs/'),
           API.get('/applications/'),
         ]);
+
         const all  = cRes.data;
         const jobs = jRes.data;
         const apps = appRes.data;
@@ -83,6 +84,8 @@ const Dashboard = () => {
       setLoading(false);
     };
     load();
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {

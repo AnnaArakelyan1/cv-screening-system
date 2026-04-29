@@ -37,7 +37,11 @@ const Jobs = () => {
     }
   };
 
-  useEffect(() => { fetchJobs(); }, []);
+  useEffect(() => {
+    fetchJobs();
+    const interval = setInterval(fetchJobs, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     let out = jobs;

@@ -1,14 +1,21 @@
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from database import engine, Base, SessionLocal
-from routers import auth, candidates, jobs, applications, email, users, stats
+from routers import auth, candidates, jobs, applications, email, users, stats, audit
 from models.user import User
 from models.job_report import JobReport
 from utils.auth import hash_password
+from config import settings
 
 logger = logging.getLogger(__name__)
+
+limiter = Limiter(key_func=get_remote_address)
 
 Base.metadata.create_all(bind=engine)
 
@@ -16,11 +23,11 @@ Base.metadata.create_all(bind=engine)
 async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
-        if not db.query(User).filter(User.email == "admin@yourcompany.com").first():
+        if not db.query(User).filter(User.email == settings.ADMIN_EMAIL).first():
             admin = User(
                 full_name="Admin",
-                email="admin@yourcompany.com",
-                hashed_password=hash_password("admin123"),
+                email=settings.ADMIN_EMAIL,
+                hashed_password=hash_password(settings.ADMIN_PASSWORD),
                 is_admin=True,
             )
             db.add(admin)
@@ -42,6 +49,8 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="CV Screening System", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -58,6 +67,7 @@ app.include_router(applications.router, prefix="/applications", tags=["Applicati
 app.include_router(email.router, prefix="/email", tags=["Email"])
 app.include_router(users.router, prefix="/users", tags=["Users"])
 app.include_router(stats.router, prefix="/stats", tags=["Stats"])
+app.include_router(audit.router, prefix="/audit", tags=["Audit"])
 
 @app.get("/")
 def root():

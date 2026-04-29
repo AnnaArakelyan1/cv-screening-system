@@ -18,3 +18,4 @@ sentence-transformers
 groq
 reportlab
 watchfiles
+slowapi

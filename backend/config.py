@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     LLM_PROVIDER: str = "groq"
     LLM_MODEL: str = ""
+    ADMIN_EMAIL: str = "admin@yourcompany.com"
+    ADMIN_PASSWORD: str = "admin123"
 
     class Config:
         env_file = ".env"

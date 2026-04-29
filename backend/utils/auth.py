@@ -6,6 +6,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from database import get_db
 from models.user import User
+from models.revoked_token import RevokedToken
 from config import settings
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -36,10 +37,12 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     except JWTError:
         raise credentials_exception
 
+    if db.query(RevokedToken).filter(RevokedToken.token == token).first():
+        raise HTTPException(status_code=401, detail="Token has been revoked. Please log in again.")
+
     try:
         user = db.query(User).filter(User.id == int(user_id)).first()
     except ValueError:
-        # legacy tokens stored email instead of id
         user = db.query(User).filter(User.email == user_id).first()
     if user is None:
         raise credentials_exception

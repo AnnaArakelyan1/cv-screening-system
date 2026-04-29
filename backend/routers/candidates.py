@@ -11,6 +11,7 @@ from utils.auth import get_current_user
 from utils.cv_parser import parse_cv_fast, is_likely_cv, build_embedding_text
 from utils.matcher import get_embedding, cluster_candidates
 from utils.tasks import enrich_and_match
+from utils.audit import log_action
 from models.match_result import MatchResult
 from utils.email_sender import send_email
 from typing import List
@@ -47,6 +48,17 @@ async def upload_cv(
         raise HTTPException(status_code=400, detail="Only PDF and DOCX files are supported")
 
     file_bytes = await file.read()
+
+    if len(file_bytes) > 10 * 1024 * 1024:  # 10MB limit
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 10MB")
+
+    # Verify actual file signature (magic bytes) matches declared extension
+    is_pdf  = file_bytes[:4] == b'%PDF'
+    is_docx = file_bytes[:4] == b'PK\x03\x04'  # ZIP-based format
+    if file.filename.endswith(".pdf") and not is_pdf:
+        raise HTTPException(status_code=400, detail="File is not a valid PDF")
+    if file.filename.endswith(".docx") and not is_docx:
+        raise HTTPException(status_code=400, detail="File is not a valid DOCX")
     parsed = parse_cv_fast(file_bytes, file.filename)
 
     cv_valid, gemini_name = is_likely_cv(parsed)
@@ -96,6 +108,12 @@ async def upload_cv(
 
     db.add(Application(candidate_id=candidate.id, job_id=job_id))
     db.commit()
+    log_action(db, current_user, "cv_uploaded", {
+        "candidate_id": candidate.id,
+        "candidate_name": candidate.full_name,
+        "job_id": job_id,
+        "filename": file.filename,
+    })
 
     if candidate.email:
         background_tasks.add_task(
@@ -182,6 +200,11 @@ def delete_candidate(
         raise HTTPException(status_code=404, detail="Candidate not found")
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Only admins can delete candidates")
+    log_action(db, current_user, "candidate_deleted", {
+        "candidate_id": candidate.id,
+        "candidate_name": candidate.full_name,
+        "candidate_email": candidate.email,
+    })
     db.delete(candidate)
     db.commit()
     return {"message": "Candidate deleted successfully"}

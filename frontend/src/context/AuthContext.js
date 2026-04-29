@@ -22,7 +22,10 @@ export const AuthProvider = ({ children }) => {
     setUser({ token });
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await API.post('/auth/logout');
+    } catch {}
     localStorage.removeItem('token');
     setUser(null);
   };

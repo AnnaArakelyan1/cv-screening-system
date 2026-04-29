@@ -34,10 +34,15 @@ SKILLS_KEYWORDS = [
 EDUCATION_KEYWORDS = [
     "education", "academic", "qualification", "degree", "university", "college",
     "bachelor", "master", "phd", "diploma", "institute", "school", "graduated",
+    # Armenian
+    "կրթություն", "ուսուցում", "բակալավր", "մագիստր", "դիպլոմ", "համալսարան",
+    "քոլեջ", "ասպիրանտուրա",
 ]
 EXPERIENCE_KEYWORDS = [
     "experience", "employment", "work history", "career", "professional background",
     "positions held", "work experience", "professional experience",
+    # Armenian
+    "աշխատանքային փորձ", "փորձ", "աշխատանք", "կարիերա",
 ]
 SKILLS_SECTION_KEYWORDS = [
     "skills", "technical skills", "technologies", "tools", "competencies",
@@ -46,10 +51,21 @@ SKILLS_SECTION_KEYWORDS = [
 
 
 def is_likely_cv_regex(parsed: dict) -> bool:
+    text = (parsed.get("raw_text") or "").lower()
+    if len(text.split()) < 30:
+        return False
+
+    has_email = bool(parsed.get("email"))
+    has_phone = bool(parsed.get("phone"))
+
+    # Email + phone together is a strong CV signal — let Gemini make the final call
+    if has_email and has_phone:
+        return True
+
     signals = 0
-    if parsed.get("email"):
+    if has_email:
         signals += 2
-    if parsed.get("phone"):
+    if has_phone:
         signals += 1
     if parsed.get("skills"):
         signals += 2
@@ -57,15 +73,15 @@ def is_likely_cv_regex(parsed: dict) -> bool:
         signals += 2
     if parsed.get("education"):
         signals += 2
-    text = (parsed.get("raw_text") or "").lower()
-    if len(text.split()) < 30:
-        return False
     cv_hints = [
         "experience", "education", "skills", "work", "university", "degree",
         "developer", "engineer", "manager", "analyst", "resume", "cv",
+        # Armenian
+        "կրթություն", "փորձ", "հմտություններ", "համալսարան", "բակալավր",
+        "մագիստր", "աշխատանք", "անձնական", "տվյալներ",
     ]
     for hint in cv_hints:
-        if re.search(r'\b' + hint + r'\b', text):
+        if hint in text:
             signals += 1
     return signals >= 4
 
